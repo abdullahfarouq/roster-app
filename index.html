@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="ar" dir="rtl">
+<html lang="en" dir="ltr">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
@@ -178,6 +178,32 @@ th{color:var(--gold);font-weight:700;}
 .cal-table th{background:rgba(255,255,255,0.08);color:var(--gold);}
 .holiday-badge{display:inline-block;background:rgba(255,92,92,0.2);color:var(--danger);border:1px solid rgba(255,92,92,0.4);border-radius:6px;padding:2px 6px;font-size:.7rem;margin-top:3px;}
 
+.home-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-top:8px;}
+@media(max-width:760px){.home-grid{grid-template-columns:repeat(2,1fr);}}
+.home-tile{
+  background:var(--glass);
+  backdrop-filter:blur(50px) saturate(260%);
+  -webkit-backdrop-filter:blur(50px) saturate(260%);
+  border:1px solid var(--border);
+  border-radius:24px;
+  aspect-ratio:1/1;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  gap:12px;
+  cursor:pointer;
+  transition:transform .2s cubic-bezier(.175,.885,.32,1.275), box-shadow .2s, border-color .2s;
+}
+.home-tile:hover{transform:translateY(-4px) scale(1.03);box-shadow:0 12px 30px rgba(255,214,10,0.15);border-color:rgba(255,214,10,0.4);}
+.home-tile:active{transform:scale(.97);}
+.home-tile-icon{font-size:2.6rem;filter:drop-shadow(0 4px 10px rgba(255,214,10,0.25));}
+.home-tile-label{font-weight:700;font-size:.98rem;color:var(--cream);text-align:center;padding:0 8px;}
+.crew-menu{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:18px;}
+@media(max-width:760px){.crew-menu{grid-template-columns:repeat(2,1fr);}}
+.crew-menu-tile{background:rgba(255,255,255,0.035);border:1px solid var(--border);border-radius:18px;padding:20px 10px;text-align:center;cursor:pointer;transition:transform .18s, border-color .18s;}
+.crew-menu-tile:hover{transform:translateY(-3px);border-color:rgba(255,214,10,0.35);}
+.crew-menu-tile .ic{font-size:1.8rem;margin-bottom:8px;}
 ::-webkit-scrollbar{width:8px;}
 ::-webkit-scrollbar-thumb{background:rgba(255,214,10,0.3);border-radius:10px;}
 </style>
@@ -201,7 +227,7 @@ th{color:var(--gold);font-weight:700;}
 <script>
 /* ===================== STATE & STORAGE ===================== */
 let state = null;
-let currentTab = 'crew';
+let currentTab = 'home';
 let aiHistory = [];
 
 const shiftNamesArabic = {
@@ -211,6 +237,34 @@ const shiftNamesArabic = {
   4: 'الوردية الرابعة'
 };
 
+/* ===================== i18n ===================== */
+const I18N = {
+  en:{
+    home:'Home', share:'Share as image',
+    tab_crew:'Operations & Equipment', tab_pier:'Berth Plan', tab_roster:'Shift Schedule',
+    tab_calendar:'Rotation Table', tab_leaves:'Leaves', tab_handover:'Handover', tab_settings:'Settings',
+    login_title:'Sign in to save & sync your data', login_name:'Name', login_phone:'Phone (optional)',
+    login_email:'Email (optional)', login_btn:'Sign in', login_hint:'Use the same name/phone from any device to retrieve your saved data.'
+  },
+  ar:{
+    home:'الرئيسية', share:'مشاركة كصورة',
+    tab_crew:'التشغيل والمعدات', tab_pier:'خطة الأرصفة', tab_roster:'جدول الوردية',
+    tab_calendar:'جدول المناوبات', tab_leaves:'الإجازات', tab_handover:'التسليم والتسلم', tab_settings:'الإعدادات',
+    login_title:'سجّل الدخول لحفظ ومزامنة بياناتك', login_name:'الاسم', login_phone:'رقم التليفون (اختياري)',
+    login_email:'البريد الإلكتروني (اختياري)', login_btn:'دخول', login_hint:'استخدم نفس الاسم أو رقم التليفون من أي جهاز لاسترجاع بياناتك المحفوظة.'
+  }
+};
+function currentLang(){ return (state && state.lang) || localStorage.getItem('roster_lang') || 'en'; }
+function t(key){ const l=currentLang(); return (I18N[l]&&I18N[l][key]) || I18N.en[key] || key; }
+function tTab(id){ return t('tab_'+id); }
+function setLang(l){
+  localStorage.setItem('roster_lang', l);
+  if(state){ state.lang = l; saveState(); }
+  document.documentElement.setAttribute('lang', l);
+  document.documentElement.setAttribute('dir', l==='ar'?'rtl':'ltr');
+  render();
+}
+
 function keyFor(email){
   return 'roster_app:' + (email||'').toLowerCase().trim().replace(/[^a-z0-9.]/g,'_');
 }
@@ -218,9 +272,10 @@ function uid(){ return Math.random().toString(36).slice(2,10); }
 function todayStr(){ return new Date().toISOString().slice(0,10); }
 function nowStr(){ const d=new Date(); return d.toLocaleString('ar-EG'); }
 
-function blankState(email,name){
+function blankState(loginId,name,phone,email){
   return {
-    email, name, shiftName:'الوردية الأولى',
+    loginId, name, phone:phone||'', email:email||'', shiftName:'الوردية الأولى',
+    lang: localStorage.getItem('roster_lang') || 'en',
     crew:{ operators:[], loaders:[], forklifts:[], cranes:[], other:[] },
     vessels:[],
     leaves:[],
@@ -235,11 +290,11 @@ function blankState(email,name){
 
 function saveState(){
   try{
-    if(!state || !state.email) return;
-    localStorage.setItem(keyFor(state.email), JSON.stringify(state));
-    localStorage.setItem('roster_current_user_email', state.email);
+    if(!state || !state.loginId) return;
+    localStorage.setItem(keyFor(state.loginId), JSON.stringify(state));
+    localStorage.setItem('roster_current_user_id', state.loginId);
     localStorage.setItem('roster_current_user_name', state.name);
-  }catch(e){ console.error('save failed', e); alert('تعذر حفظ البيانات محلياً — تأكد أن مساحة التخزين غير ممتلئة.'); }
+  }catch(e){ console.error('save failed', e); alert(currentLang()==='ar'?'تعذر حفظ البيانات محلياً — تأكد أن مساحة التخزين غير ممتلئة.':'Could not save data locally — please check your storage space.'); }
 }
 function log(entity, action, before, after){
   if(!state.logs) state.logs = [];
@@ -249,40 +304,50 @@ function log(entity, action, before, after){
 
 /* ===================== LOGIN ===================== */
 function tryLogin(){
-  const email = document.getElementById('loginEmail').value.trim();
   const name = document.getElementById('loginName').value.trim();
-  if(!email || !name){ alert('من فضلك ادخل الاسم والإيميل'); return; }
+  const phone = document.getElementById('loginPhone').value.trim();
+  const email = document.getElementById('loginEmail').value.trim();
+  if(!name){ alert(currentLang()==='ar'?'من فضلك ادخل الاسم':'Please enter your name'); return; }
+  const loginId = (phone || email || name);
   try{
-    const localData = localStorage.getItem(keyFor(email));
+    const localData = localStorage.getItem(keyFor(loginId));
     if(localData){
       state = JSON.parse(localData);
-      if(name) state.name = name;
+      state.name = name;
+      if(phone) state.phone = phone;
+      if(email) state.email = email;
       if(!state.crew.cranes) state.crew.cranes = [];
       if(!state.handoverVessels) state.handoverVessels = [];
       if(!state.yard) state.yard = {name:'', notes:''};
+      if(!state.lang) state.lang = localStorage.getItem('roster_lang') || 'en';
     } else {
-      state = blankState(email, name);
+      state = blankState(loginId, name, phone, email);
     }
     saveState();
   }catch(e){
-    state = blankState(email, name);
+    state = blankState(loginId, name, phone, email);
     saveState();
   }
+  document.documentElement.setAttribute('lang', state.lang);
+  document.documentElement.setAttribute('dir', state.lang==='ar'?'rtl':'ltr');
   render();
 }
 
 function checkAutoLogin(){
   try{
-    const savedEmail = localStorage.getItem('roster_current_user_email');
+    const savedId = localStorage.getItem('roster_current_user_id');
     const savedName = localStorage.getItem('roster_current_user_name');
-    if(savedEmail){
-      const localData = localStorage.getItem(keyFor(savedEmail));
+    if(savedId){
+      const localData = localStorage.getItem(keyFor(savedId));
       if(localData){
         state = JSON.parse(localData);
         if(savedName) state.name = savedName;
         if(!state.crew.cranes) state.crew.cranes = [];
         if(!state.handoverVessels) state.handoverVessels = [];
         if(!state.yard) state.yard = {name:'', notes:''};
+        if(!state.lang) state.lang = localStorage.getItem('roster_lang') || 'en';
+        document.documentElement.setAttribute('lang', state.lang);
+        document.documentElement.setAttribute('dir', state.lang==='ar'?'rtl':'ltr');
       }
     }
   }catch(e){ console.error('auto login failed', e); }
@@ -290,46 +355,50 @@ function checkAutoLogin(){
 
 function renderLogin(){
   const app = document.getElementById('app');
+  const l = currentLang();
   app.innerHTML = `
   <div class="login-wrap">
     <div class="card login-card">
+      <div class="row" style="justify-content:flex-end;margin-bottom:10px;">
+        <button class="btn-ghost btn-sm ${l==='en'?'btn-gold':''}" onclick="setLang('en')">English</button>
+        <button class="btn-ghost btn-sm ${l==='ar'?'btn-gold':''}" onclick="setLang('ar')">العربية</button>
+      </div>
       <div class="brand" style="margin-bottom:18px;justify-content:center;">
         <div class="dot"></div><span>ROSTER</span>
       </div>
-      <h2 style="text-align:center;color:var(--cream);font-weight:400;margin-bottom:20px;">تسجيل الدخول لحفظ ومزامنة بياناتك</h2>
-      <div class="field"><label>الاسم</label><input id="loginName" placeholder="اسمك"></div>
-      <div class="field"><label>البريد الإلكتروني</label><input id="loginEmail" placeholder="example@mail.com" type="email"></div>
-      <button class="btn-gold" style="width:100%;margin-top:6px;" id="loginBtn" onclick="tryLogin()">دخول</button>
-      <p class="muted" style="text-align:center;margin-top:14px;">استخدم نفس الإيميل من أي جهاز لاسترجاع بياناتك المحفوظة.</p>
+      <h2 style="text-align:center;color:var(--cream);font-weight:400;margin-bottom:20px;">${t('login_title')}</h2>
+      <div class="field"><label>${t('login_name')}</label><input id="loginName" placeholder="${t('login_name')}"></div>
+      <div class="field"><label>${t('login_phone')}</label><input id="loginPhone" placeholder="+20..." type="tel"></div>
+      <div class="field"><label>${t('login_email')}</label><input id="loginEmail" placeholder="example@mail.com" type="email"></div>
+      <button class="btn-gold" style="width:100%;margin-top:6px;" id="loginBtn" onclick="tryLogin()">${t('login_btn')}</button>
+      <p class="muted" style="text-align:center;margin-top:14px;">${t('login_hint')}</p>
     </div>
   </div>`;
 }
 
 /* ===================== SHELL / TABS ===================== */
 const TABS = [
-  {id:'crew', label:'الطاقم والأوناش'},
-  {id:'pier', label:'بيرس بلان'},
-  {id:'roster', label:'الروستر'},
-  {id:'calendar', label:'🗓️ تقويم الورديات'},
-  {id:'leaves', label:'الإجازات'},
-  {id:'handover', label:'التسليم والتسلم'},
-  {id:'reports', label:'التقارير'},
-  {id:'settings', label:'الإعدادات'},
+  {id:'crew', label:'التشغيل والمعدات', icon:'🏗️'},
+  {id:'pier', label:'خطة الأرصفة', icon:'⚓'},
+  {id:'roster', label:'جدول الوردية', icon:'📋'},
+  {id:'calendar', label:'جدول المناوبات', icon:'🗓️'},
+  {id:'leaves', label:'الإجازات', icon:'🌴'},
+  {id:'handover', label:'التسليم والتسلم', icon:'🔄'},
+  {id:'settings', label:'الإعدادات', icon:'⚙️'},
 ];
 
 function render(){
   if(!state){ renderLogin(); return; }
   const app = document.getElementById('app');
+  const isHome = currentTab==='home';
   app.innerHTML = `
     <div class="topbar glass">
-      <div class="brand"><div class="dot"></div><span>ROSTER</span></div>
+      <div class="brand" style="cursor:pointer;" onclick="switchTab('home')"><div class="dot"></div><span>ROSTER</span></div>
       <div class="row">
-        <span class="muted">${esc(state.name)} · ${esc(state.shiftName)}</span>
-        <button class="btn-ghost btn-sm" onclick="shareCurrent()">📤 مشاركة كصورة</button>
+        <span class="muted">${esc(state.name)}</span>
+        ${!isHome?`<button class="btn-ghost btn-sm" onclick="switchTab('home')">🏠 ${t('home')}</button>`:''}
+        ${!isHome?`<button class="btn-ghost btn-sm" onclick="shareCurrent()">📤 ${t('share')}</button>`:''}
       </div>
-    </div>
-    <div class="tabs">
-      ${TABS.map(t=>`<div class="tab ${currentTab===t.id?'active':''}" onclick="switchTab('${t.id}')">${t.label}</div>`).join('')}
     </div>
     <div id="tabContent"></div>
   `;
@@ -339,56 +408,105 @@ function switchTab(id){ currentTab=id; render(); }
 function renderTab(){
   const c = document.getElementById('tabContent');
   if(!c) return;
-  if(currentTab==='crew') c.innerHTML = viewCrew();
+  if(currentTab==='home') c.innerHTML = viewHome();
+  else if(currentTab==='crew') c.innerHTML = viewCrew();
   else if(currentTab==='pier') c.innerHTML = viewPier();
   else if(currentTab==='roster') c.innerHTML = viewRoster();
   else if(currentTab==='calendar') c.innerHTML = viewCalendar();
   else if(currentTab==='leaves') c.innerHTML = viewLeaves();
   else if(currentTab==='handover') c.innerHTML = viewHandover();
-  else if(currentTab==='reports') c.innerHTML = viewReports();
   else if(currentTab==='settings') c.innerHTML = viewSettings();
   bindTabEvents();
 }
 
+/* ===================== HOME ICON GRID ===================== */
+function viewHome(){
+  return `
+  <div class="home-grid">
+    ${TABS.map(t=>`
+      <div class="home-tile" onclick="switchTab('${t.id}')">
+        <div class="home-tile-icon">${t.icon}</div>
+        <div class="home-tile-label">${esc(tTab(t.id))}</div>
+      </div>`).join('')}
+  </div>`;
+}
+
 /* ===================== CREW & FLEET ===================== */
+let crewSubTab = null;
+const CREW_SECTIONS = [
+  {id:'cranes', icon:'🏗️', ar:'الأوناش', en:'Cranes'},
+  {id:'operators', icon:'👷', ar:'مشغلو الرافعات', en:'Crane Operators'},
+  {id:'loaders', icon:'🚜', ar:'اللوادر', en:'Loaders'},
+  {id:'forklifts', icon:'🔧', ar:'الشوكات', en:'Forklifts'},
+];
+function setCrewSub(id){ crewSubTab = id; renderTab(); }
 function viewCrew(){
   if(!state.crew.cranes) state.crew.cranes = [];
-  return `
-  <div id="captureArea">
-  <h1>الطاقم والأوناش والمعدات</h1>
-  <div class="g4">
+  const ar = currentLang()==='ar';
+  if(!crewSubTab){
+    return `
+    <div id="captureArea">
+    <h1>${ar?'التشغيل والمعدات':'Operations & Equipment'}</h1>
+    <div class="crew-menu">
+      ${CREW_SECTIONS.map(s=>`
+        <div class="crew-menu-tile" onclick="setCrewSub('${s.id}')">
+          <div class="ic">${s.icon}</div>
+          <div>${ar?s.ar:s.en}</div>
+        </div>`).join('')}
+    </div>
+    </div>`;
+  }
+
+  const sec = CREW_SECTIONS.find(s=>s.id===crewSubTab);
+  let body = '';
+  if(crewSubTab==='cranes'){
+    body = `
     <div class="card">
-      <h3>🏗️ قائمة الأوناش الدائمة</h3>
+      <h3>🏗️ ${ar?'قائمة الأوناش الدائمة':'Permanent Crane List'}</h3>
       <div id="craneMasterList">${renderMasterCranes()}</div>
       <div class="divider"></div>
-      <div class="field"><label>رقم / اسم الونش</label><input id="masterCraneNum" placeholder="مثال: 110 أو 011"></div>
-      <button class="btn-gold" style="width:100%" onclick="addMasterCrane()">إضافة ونش جديد</button>
-    </div>
+      <div class="field"><label>${ar?'رقم / اسم الونش':'Crane number / name'}</label><input id="masterCraneNum" placeholder="${ar?'مثال: 110':'e.g. 110'}"></div>
+      <button class="btn-gold" style="width:100%" onclick="addMasterCrane()">${ar?'إضافة ونش جديد':'Add crane'}</button>
+    </div>`;
+  } else if(crewSubTab==='operators'){
+    body = `
     <div class="card">
-      <h3>طاقم الوناشين</h3>
+      <h3>${ar?'مشغلو الرافعات':'Crane Operators'}</h3>
       <div id="opList">${renderOperators()}</div>
       <div class="divider"></div>
-      <div class="field"><label>اسم الونّاش</label><input id="opName" placeholder="اكتب الاسم"></div>
-      <div class="field"><label>التصنيف</label>
-        <select id="opRating"><option value="A">A</option><option value="B">B</option><option value="C">C</option></select>
+      <div class="field"><label>${ar?'اسم المشغل':'Operator name'}</label><input id="opName" placeholder="${ar?'اكتب الاسم':'Enter name'}"></div>
+      <div class="field"><label>${ar?'التصنيف (اختياري)':'Rating (optional)'}</label>
+        <select id="opRating"><option value="">${ar?'-- بدون تقييم --':'-- No rating --'}</option><option value="A">A</option><option value="B">B</option><option value="C">C</option></select>
       </div>
-      <button class="btn-gold" style="width:100%" onclick="addOperator()">إضافة ونّاش</button>
-    </div>
+      <button class="btn-gold" style="width:100%" onclick="addOperator()">${ar?'إضافة مشغل':'Add operator'}</button>
+    </div>`;
+  } else if(crewSubTab==='loaders'){
+    body = `
     <div class="card">
-      <h3>معدات - لوادر (Loaders)</h3>
+      <h3>${ar?'اللوادر (Loaders)':'Loaders'}</h3>
       <div id="loaderList">${renderEquipList('loaders')}</div>
       <div class="divider"></div>
-      <div class="field"><label>رقم اللودر</label><input id="loaderNum" placeholder="مثال: 419"></div>
-      <button class="btn-gold" style="width:100%" onclick="addEquip('loaders','loaderNum')">إضافة لودر</button>
-    </div>
+      <div class="field"><label>${ar?'رقم اللودر':'Loader number'}</label><input id="loaderNum" placeholder="${ar?'مثال: 419':'e.g. 419'}"></div>
+      <button class="btn-gold" style="width:100%" onclick="addEquip('loaders','loaderNum')">${ar?'إضافة لودر':'Add loader'}</button>
+    </div>`;
+  } else if(crewSubTab==='forklifts'){
+    body = `
     <div class="card">
-      <h3>معدات - شوكة (Forklifts)</h3>
+      <h3>${ar?'الشوكات (Forklifts)':'Forklifts'}</h3>
       <div id="forkList">${renderEquipList('forklifts')}</div>
       <div class="divider"></div>
-      <div class="field"><label>رقم الشوكة</label><input id="forkNum" placeholder="مثال: F-05"></div>
-      <button class="btn-gold" style="width:100%" onclick="addEquip('forklifts','forkNum')">إضافة شوكة</button>
-    </div>
+      <div class="field"><label>${ar?'رقم الشوكة':'Forklift number'}</label><input id="forkNum" placeholder="${ar?'مثال: F-05':'e.g. F-05'}"></div>
+      <button class="btn-gold" style="width:100%" onclick="addEquip('forklifts','forkNum')">${ar?'إضافة شوكة':'Add forklift'}</button>
+    </div>`;
+  }
+
+  return `
+  <div id="captureArea">
+  <div class="row" style="justify-content:space-between;margin-bottom:12px;">
+    <h1 style="margin:0;">${sec.icon} ${ar?sec.ar:sec.en}</h1>
+    <button class="btn-ghost btn-sm" onclick="setCrewSub(null)">◀ ${ar?'رجوع للقائمة':'Back to list'}</button>
   </div>
+  ${body}
   </div>`;
 }
 
@@ -421,16 +539,17 @@ function deleteMasterCrane(id){
 }
 
 function renderOperators(){
-  if(!state.crew.operators.length) return `<div class="empty muted">لا يوجد ونّاشين بعد</div>`;
+  const ar = currentLang()==='ar';
+  if(!state.crew.operators.length) return `<div class="empty muted">${ar?'لا يوجد مشغلين بعد':'No operators yet'}</div>`;
   return state.crew.operators.map(o=>`
     <div class="list-item">
       <div class="row">
-        <span class="pill pill-${esc(o.rating)}">${esc(o.rating)}</span>
+        ${o.rating?`<span class="pill pill-${esc(o.rating)}">${esc(o.rating)}</span>`:''}
         <b>${esc(o.name)}</b>
-        ${isOnLeaveToday(o.name)?'<span class="muted">(في إجازة اليوم)</span>':''}
+        ${isOnLeaveToday(o.name)?`<span class="muted">(${ar?'في إجازة اليوم':'on leave today'})</span>`:''}
       </div>
       <div class="row">
-        <button class="btn-danger btn-sm" onclick="deleteOperator('${o.id}')">حذف</button>
+        <button class="btn-danger btn-sm" onclick="deleteOperator('${o.id}')">${ar?'حذف':'Delete'}</button>
       </div>
     </div>`).join('');
 }
@@ -1000,7 +1119,10 @@ function renderCrane(date,vId,cr){
       }).join('') || '<span class="muted">لا يوجد ونّاشين تعينوا بعد</span>'}</div>
       
       <div class="row">
-        <input type="text" id="opInput-${esc(cr.id)}" style="max-width:240px; padding:8px; border-radius:10px; border:1px solid var(--border); background:rgba(255,255,255,0.04); color:var(--cream);" placeholder="اكتب اسم الونّاش هنا...">
+        <select id="opInput-${esc(cr.id)}" style="max-width:240px;">
+          <option value="">-- اختر مشغل --</option>
+          ${state.crew.operators.filter(o=>!isOnLeave(o.name,date) && !cr.operators.includes(o.id)).map(o=>`<option value="${esc(o.name)}">${esc(o.name)}</option>`).join('')}
+        </select>
         <button class="btn-ghost btn-sm" onclick="assignOperatorText('${esc(date)}','${esc(vId)}','${esc(cr.id)}')">إضافة</button>
       </div>
     </div>
@@ -1036,7 +1158,8 @@ function buildRosterTableHTML(date){
       const loaderTxt = cr.equipment.filter(e=>e.type==='loader').map(e=>e.label.replace('لودر ','')).join(' / ') || '-';
       const opsTxt = cr.operators.map(oid=>{
         const op = state.crew.operators.find(o=>o.id===oid);
-        return op? op.name : null;
+        if(!op || isOnLeave(op.name, date)) return null;
+        return op.name;
       }).filter(Boolean).join(' - ') || '-';
       rows.push({
         vessel: rv.name,
@@ -1125,7 +1248,7 @@ function assignOperatorText(date, vId, crId) {
 
     let op = state.crew.operators.find(o => o.name === opName);
     if(!op) {
-        op = { id: uid(), name: opName, rating: 'A' };
+        op = { id: uid(), name: opName, rating: '' };
         state.crew.operators.push(op);
     }
 
@@ -1256,14 +1379,14 @@ function viewCalendar(){
   const monthsArabic = ['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'];
 
   let yearOptionsHTML = '';
-  for(let yr = 2026; yr <= 2050; yr++){
+  for(let yr = 2026; yr <= 2126; yr++){
     yearOptionsHTML += `<option value="${yr}" ${y===yr?'selected':''}>${yr}</option>`;
   }
 
   return `
   <div id="captureArea">
-    <h1>🗓️ تقويم الورديات (Rotation Calendar 2026 - 2050)</h1>
-    <p class="muted">يغطي التقويم الفترة حتى عام 2050 بنمط منتظم ومتصل مستند إلى الأشهر الثلاثة الأولى.</p>
+    <h1>🗓️ ${currentLang()==='ar'?'جدول المناوبات (نمط دائم بلا نهاية)':'Rotation Table (permanent, endless pattern)'}</h1>
+    <p class="muted">${currentLang()==='ar'?'يتبع الجدول نمطاً ثابتاً ومتكرراً إلى ما لا نهاية، ولا يتأثر بالإجازات أو تغيير السنة.':'The table follows a fixed, endlessly repeating pattern and is not affected by leaves or the selected year.'}</p>
 
     <div class="card" style="margin-bottom:16px;">
       <div class="row" style="justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
@@ -1294,7 +1417,7 @@ function viewCalendar(){
           </div>
 
           <div class="field" style="margin-bottom:0; min-width:110px;">
-            <label>السنة (إلى 2050)</label>
+            <label>${currentLang()==='ar'?'السنة':'Year'}</label>
             <select id="calYearSel" onchange="calTargetDate.setFullYear(parseInt(this.value)); renderTab();">
               ${yearOptionsHTML}
             </select>
@@ -1758,25 +1881,43 @@ function bindReportsSearch(){
 
 /* ===================== SETTINGS ===================== */
 function viewSettings(){
+  const l = currentLang();
+  const ar = l==='ar';
   return `
   <div id="captureArea">
-  <h1>الإعدادات والنسخ الاحتياطي</h1>
+  <h1>${ar?'الإعدادات والنسخ الاحتياطي':'Settings & Backup'}</h1>
   <div class="g2">
     <div class="card">
-      <h3>مفتاح Gemini API (للتحليل الذكي والصور)</h3>
-      <div class="field"><label>Gemini API Key</label>
-        <input id="apiKeyInput" type="password" value="${esc(state.geminiApiKey||'')}" placeholder="AIzaSy...">
+      <h3>${ar?'لغة البرنامج':'App Language'}</h3>
+      <p class="muted">${ar?'اللغة الافتراضية للنظام هي الإنجليزية.':'The default system language is English.'}</p>
+      <div class="row" style="margin-top:10px;">
+        <button class="btn-ghost btn-sm ${l==='en'?'btn-gold':''}" onclick="setLang('en')">English</button>
+        <button class="btn-ghost btn-sm ${l==='ar'?'btn-gold':''}" onclick="setLang('ar')">العربية</button>
       </div>
-      <button class="btn-gold" onclick="saveApiKey()">حفظ المفتاح</button>
     </div>
 
     <div class="card">
-      <h3>البيانات والتخزين المحلي</h3>
-      <p class="muted">يمكنك تصدير قاعدة البيانات كملف JSON للاحتفاظ بنسخة احتياطية أو استعادتها لاحقاً.</p>
-      <div class="row" style="margin-top:14px;">
-        <button class="btn-ghost" onclick="exportData()">📥 تصدير البيانات (JSON)</button>
-        <button class="btn-danger btn-sm" onclick="clearLocalData()">🗑️ مسح بيانات الحساب</button>
+      <h3>${ar?'مفتاح Gemini API (للتحليل الذكي والصور)':'Gemini API Key (AI & image analysis)'}</h3>
+      <div class="field"><label>Gemini API Key</label>
+        <input id="apiKeyInput" type="password" value="${esc(state.geminiApiKey||'')}" placeholder="AIzaSy...">
       </div>
+      <button class="btn-gold" onclick="saveApiKey()">${ar?'حفظ المفتاح':'Save Key'}</button>
+    </div>
+
+    <div class="card">
+      <h3>${ar?'البيانات والتخزين المحلي':'Data & Local Storage'}</h3>
+      <p class="muted">${ar?'يمكنك تصدير قاعدة البيانات كملف JSON للاحتفاظ بنسخة احتياطية أو استعادتها لاحقاً.':'You can export the database as a JSON file to keep a backup or restore it later.'}</p>
+      <div class="row" style="margin-top:14px;">
+        <button class="btn-ghost" onclick="exportData()">📥 ${ar?'تصدير البيانات (JSON)':'Export Data (JSON)'}</button>
+        <button class="btn-danger btn-sm" onclick="clearLocalData()">🗑️ ${ar?'مسح بيانات الحساب':'Clear Account Data'}</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>${ar?'معلومات المطوّر':'Developer Info'}</h3>
+      <div class="list-item"><span class="muted">${ar?'الاسم':'Name'}</span><b>Abdullah Farouq</b></div>
+      <div class="list-item"><span class="muted">${ar?'الهاتف':'Phone'}</span><b dir="ltr">+201061947000</b></div>
+      <div class="list-item"><span class="muted">${ar?'البريد الإلكتروني':'Email'}</span><b dir="ltr">Abdullah.Farouq87@yahoo.com</b></div>
     </div>
   </div>
   </div>`;
@@ -1791,15 +1932,15 @@ function exportData(){
   const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(state, null, 2));
   const dlAnchor = document.createElement('a');
   dlAnchor.setAttribute("href", dataStr);
-  dlAnchor.setAttribute("download", `roster_backup_${esc(state.email)}_${todayStr()}.json`);
+  dlAnchor.setAttribute("download", `roster_backup_${esc(state.loginId||state.name)}_${todayStr()}.json`);
   document.body.appendChild(dlAnchor);
   dlAnchor.click();
   dlAnchor.remove();
 }
 function clearLocalData(){
-  if(!confirm('هل أنت متأكد تماماً من مسح كافة بيانات هذا الحساب؟')) return;
-  localStorage.removeItem(keyFor(state.email));
-  localStorage.removeItem('roster_current_user_email');
+  if(!confirm(currentLang()==='ar'?'هل أنت متأكد تماماً من مسح كافة بيانات هذا الحساب؟':'Are you sure you want to erase all data for this account?')) return;
+  localStorage.removeItem(keyFor(state.loginId));
+  localStorage.removeItem('roster_current_user_id');
   localStorage.removeItem('roster_current_user_name');
   state = null;
   renderLogin();
@@ -1915,6 +2056,9 @@ function esc(str){
 }
 
 window.onload = function(){
+  const savedLang = localStorage.getItem('roster_lang') || 'en';
+  document.documentElement.setAttribute('lang', savedLang);
+  document.documentElement.setAttribute('dir', savedLang==='ar'?'rtl':'ltr');
   checkAutoLogin();
   render();
 };
