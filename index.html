@@ -552,6 +552,20 @@ body{font-family:var(--font-ar),"Cairo","Noto Naskh Arabic","Geeza Pro",sans-ser
 .tbt-box textarea{font-size:1.8rem!important;line-height:2!important;min-height:220px!important;padding:22px!important;}
 @media (max-width:900px){.roster-print-header{grid-template-columns:1fr;}.roster-print-header .rph-logo,.roster-print-header .rph-meta{justify-content:center;text-align:center;}.roster-print-header .rph-logo img{margin:auto;}.rt-table{font-size:1.5rem!important;}.rt-table th,.rt-table td{font-size:1.5rem!important;padding:14px!important;}}
 </style>
+
+<style id="brand-tagline-fix">
+.brand-stack{display:flex!important;flex-direction:column!important;align-items:center!important;justify-content:center!important;gap:2px!important;}
+.brand-stack .brand-logo{width:88px!important;height:88px!important;display:block!important;}
+.brand-stack .brand-name{display:block!important;font-family:var(--af-font-en)!important;font-size:1.15rem!important;font-weight:1000!important;letter-spacing:2px!important;color:var(--af-cream)!important;text-transform:uppercase!important;line-height:1.1!important;}
+.brand-stack .brand-tagline{display:block!important;font-family:var(--af-font-en)!important;font-size:.72rem!important;font-weight:1000!important;letter-spacing:2.2px!important;color:var(--af-blue)!important;text-transform:uppercase!important;white-space:nowrap!important;line-height:1.2!important;margin-top:2px!important;}
+.brand-header{padding:3px 8px!important;}
+.roster-brand-row{display:flex!important;align-items:center!important;justify-content:space-between!important;gap:28px!important;}
+.roster-logo-block{display:flex!important;flex-direction:column!important;align-items:center!important;justify-content:center!important;min-width:180px!important;}
+.roster-brand-row img{width:150px!important;height:150px!important;display:block!important;}
+.roster-tagline{display:block!important;font-family:var(--af-font-en)!important;font-size:18px!important;font-weight:1000!important;letter-spacing:2.6px!important;text-transform:uppercase!important;color:#0A84FF!important;white-space:nowrap!important;margin-top:4px!important;line-height:1.2!important;}
+.roster-brand-copy strong{text-transform:uppercase!important;color:#111!important;}
+@media(max-width:760px){.brand-stack .brand-logo{width:72px!important;height:72px!important}.brand-stack .brand-tagline{font-size:.58rem!important;letter-spacing:1.5px!important}.roster-brand-row img{width:100px!important;height:100px!important}.roster-tagline{font-size:12px!important;letter-spacing:1.4px!important}.roster-logo-block{min-width:120px!important}}
+</style>
 </head>
 <body>
 <div id="splash-screen" aria-hidden="true">
@@ -717,9 +731,10 @@ function renderLogin(){
         <button class="btn-ghost btn-sm ${l==='en'?'btn-gold':''}" onclick="setLang('en')">English</button>
         <button class="btn-ghost btn-sm ${l==='ar'?'btn-gold':''}" onclick="setLang('ar')">العربية</button>
       </div>
-      <div class="brand" style="margin-bottom:18px;justify-content:center;">
+      <div class="brand brand-stack" style="margin-bottom:18px;justify-content:center;">
         <img class="brand-logo" src="af-logic-logo.png" alt="AF LOGIC">
-        <div class="brand-meta"><span class="brand-name">ROSTER</span><span class="brand-tagline">SIMPLY BETTER LOGIC</span></div>
+        <span class="brand-name">ROSTER</span>
+        <span class="brand-tagline">SIMPLY BETTER LOGIC</span>
       </div>
       <h2 style="text-align:center;color:var(--cream);font-weight:400;margin-bottom:20px;">${t('login_title')}</h2>
       <div class="field"><label>${t('login_name')}</label><input id="loginName" placeholder="${t('login_name')}"></div>
@@ -748,9 +763,10 @@ function render(){
   const isHome = currentTab==='home';
   app.innerHTML = `
     <div class="topbar glass">
-      <div class="brand" style="cursor:pointer;" onclick="switchTab('home')">
+      <div class="brand brand-stack brand-header" style="cursor:pointer;" onclick="switchTab('home')">
         <img class="brand-logo" src="af-logic-logo.png" alt="AF LOGIC">
-        <div class="brand-meta"><span class="brand-name">ROSTER</span><span class="brand-tagline">SIMPLY BETTER LOGIC</span></div>
+        <span class="brand-name">ROSTER</span>
+        <span class="brand-tagline">SIMPLY BETTER LOGIC</span>
       </div>
       <div class="row">
         <span class="muted">${esc(state.name)}</span>
