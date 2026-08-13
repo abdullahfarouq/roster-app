@@ -506,11 +506,23 @@ textarea{
   .rt-table th,.rt-table td{padding:11px 12px!important;}
 }
 
+
+/* FINAL UI OVERRIDES */
+:root{--af-font-ar:'Cairo','SF Arabic','Geeza Pro','Noto Naskh Arabic','Noto Sans Arabic','Arial',sans-serif;--af-font-en:'SF Pro Display','Inter','Segoe UI',Arial,sans-serif;}
+html{scroll-behavior:smooth;overflow-y:auto!important;scrollbar-width:auto!important;} body{overflow-x:hidden!important;overflow-y:auto!important;}
+#globalScrollProgress,#globalScrollRail{display:none!important;}
+.main-menu-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px;margin-top:18px;}
+.main-menu-card{position:relative;min-height:148px;padding:22px 20px;border-radius:24px;border:1px solid rgba(255,255,255,.11);background:linear-gradient(145deg,rgba(255,255,255,.075),rgba(255,255,255,.025));color:var(--af-cream);display:flex;flex-direction:column;align-items:flex-start;justify-content:flex-end;text-align:right;cursor:pointer;overflow:hidden;transition:transform .22s ease,border-color .22s ease,background .22s ease,box-shadow .22s ease;box-shadow:inset 0 1px 0 rgba(255,255,255,.08),0 14px 34px rgba(0,0,0,.20);}
+.main-menu-card:before{content:"";position:absolute;inset:auto -20% -65% 35%;height:130px;background:radial-gradient(circle,rgba(10,132,255,.22),transparent 65%);pointer-events:none;}
+.main-menu-card:hover{transform:translateY(-5px);border-color:rgba(10,132,255,.42);background:linear-gradient(145deg,rgba(10,132,255,.13),rgba(255,255,255,.035));box-shadow:inset 0 1px 0 rgba(255,255,255,.12),0 22px 48px rgba(0,0,0,.34),0 0 30px rgba(10,132,255,.08);}
+.main-menu-number{position:absolute;top:16px;left:18px;font:700 .72rem var(--af-font-en);letter-spacing:2px;color:rgba(255,255,255,.34);}.main-menu-icon{font-size:34px;line-height:1;margin-bottom:18px;}.main-menu-title{position:relative;font-size:1.08rem;font-weight:800;line-height:1.35;direction:rtl;text-align:right;}.main-menu-arrow{position:absolute;right:18px;bottom:18px;font-size:20px;color:var(--af-blue);}.home-hero{display:flex;align-items:center;gap:24px;padding:24px 26px!important;border-radius:28px!important;margin-bottom:20px;min-height:150px;}.home-hero-logo img{width:118px;height:118px;object-fit:contain;filter:drop-shadow(0 0 24px rgba(10,132,255,.35));}.home-hero-copy{flex:1;min-width:0;}.home-kicker{font:800 .72rem var(--af-font-en);letter-spacing:3px;color:var(--af-blue);margin-bottom:7px;}.home-hero h1{font-size:clamp(1.35rem,2.4vw,2rem)!important;margin-bottom:8px!important;color:var(--af-cream)!important;text-shadow:none!important;}.home-hero p{margin:0;color:var(--af-muted);font-size:1rem;line-height:1.8;}.home-note{text-align:center;color:var(--af-muted);font-size:.9rem;margin:20px 0 4px;}
+body,input,select,textarea,button{font-family:var(--af-font-ar)!important;} input,select,textarea{font-size:1rem!important;line-height:1.75!important;min-height:48px;} textarea{min-height:150px!important;padding:15px 17px!important;font-size:1.08rem!important;line-height:2!important;unicode-bidi:plaintext!important;}.tbt-box{padding:20px!important;border-radius:22px!important;}.tbt-box h3{font-size:1.15rem!important;}
+.rt-table{width:100%!important;min-width:920px!important;font-family:var(--af-font-ar)!important;font-size:1.16rem!important;table-layout:auto!important;}.rt-table th,.rt-table td{padding:15px 17px!important;font-size:1.12rem!important;line-height:1.65!important;white-space:normal!important;word-break:normal!important;overflow-wrap:anywhere!important;vertical-align:middle!important;}.rt-table thead tr:first-child th.rt-title{font-family:var(--af-font-en)!important;font-size:1.35rem!important;}.rt-table thead tr:nth-child(2) th{font-size:1.06rem!important;}.rt-table .rt-en{font-size:.9rem!important;}.rt-table tbody td{font-weight:700!important;}.rt-table td.rt-op{font-size:1.15rem!important;}.rt-table td.rt-crane{font-size:1.18rem!important;}.roster-brand-row{padding:16px 20px!important;min-height:112px;border-radius:22px!important;}.roster-brand-row img{width:104px!important;height:104px!important;}.roster-brand-copy strong{font-size:1.35rem!important;color:#111!important;letter-spacing:2px;}.roster-brand-copy span{font-size:.72rem!important;letter-spacing:1.8px;}.print-wrap{padding:24px!important;}.print-tbt{padding:18px 20px!important;}.print-tbt h4{font-size:1.25rem!important;}.print-tbt p{font-size:1.08rem!important;line-height:1.9!important;}
+#rosterTableCapture{width:max-content;min-width:100%;max-width:none;} #rosterTableCapture .rt-table{width:max-content;min-width:100%;}.zviewport,.wave-rail,.select-viewport,.zgrid,.zhint{display:none!important;}
+@media(max-width:1050px){.main-menu-grid{grid-template-columns:repeat(3,minmax(0,1fr));}}@media(max-width:760px){.main-menu-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:11px;}.main-menu-card{min-height:128px;padding:18px 16px;border-radius:19px;}.main-menu-icon{font-size:29px;margin-bottom:13px;}.main-menu-title{font-size:.98rem;}.home-hero{padding:18px!important;gap:14px;min-height:120px;}.home-hero-logo img{width:82px;height:82px;}.home-hero h1{font-size:1.15rem!important;}.home-hero p{font-size:.82rem;}.rt-table{min-width:760px!important;font-size:1rem!important;}.rt-table th,.rt-table td{padding:12px 13px!important;font-size:1rem!important;}.roster-brand-row img{width:82px!important;height:82px!important;}}@media(max-width:430px){.main-menu-grid{grid-template-columns:1fr;}.home-hero{align-items:flex-start;}.home-hero-logo img{width:70px;height:70px;}}
 </style>
 </head>
 <body>
-<div id="globalScrollProgress"></div>
-<div id="globalScrollRail"><span></span></div>
 <div id="splash-screen" aria-hidden="true">
   <div class="af-splash-inner">
     <img class="af-splash-logo" src="af-logic-logo.png" alt="AF LOGIC">
@@ -734,43 +746,29 @@ function renderTab(){
   bindTabEvents();
 }
 
-/* ===================== HOME COVERFLOW + WAVE SCENE ===================== */
+/* ===================== MODERN HOME MENU ===================== */
 function viewHome(){
-  setTimeout(initZScene, 0); // بعد ما الـ DOM يترسم فعلياً
+  const ar=currentLang()==='ar';
   return `
-  <div class="zviewport" id="zViewport">
-    <div class="wave-rail">
-      <svg viewBox="0 0 160 640" preserveAspectRatio="none">
-        <g class="wave-g">
-          <defs>
-            <linearGradient id="waveGrad" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stop-color="var(--cyber-blue)" stop-opacity="0"/>
-              <stop offset="45%" stop-color="var(--cyber-blue)" stop-opacity=".75"/>
-              <stop offset="100%" stop-color="#0066CC" stop-opacity=".9"/>
-            </linearGradient>
-            <filter id="waveGlow" x="-60%" y="-60%" width="220%" height="220%">
-              <feGaussianBlur stdDeviation="3.2" result="b"/>
-              <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
-            </filter>
-          </defs>
-          <path d="M150,0 C40,120 150,220 80,320 C10,420 130,520 60,640"
-            fill="none" stroke="url(#waveGrad)" stroke-width="2" stroke-linecap="round" opacity=".35"/>
-          <path d="M150,0 C40,120 150,220 80,320 C10,420 130,520 60,640"
-            fill="none" stroke="url(#waveGrad)" stroke-width="2.5" stroke-linecap="round" filter="url(#waveGlow)"/>
-        </g>
-      </svg>
-      <div class="wave-dot" id="waveDot"></div>
-    </div>
-    <div class="select-viewport" id="selectViewport">
-      <div class="zgrid" id="zGrid">
-        ${TABS.map((t,i)=>`
-        <div class="zcard" data-tab="${t.id}">
-          <div class="imgwrap"><span class="ic">${t.icon}</span></div>
-          <div class="panel"><div class="num">${String(i+1).padStart(3,'0')}</div><div class="t">${esc(tTab(t.id))}</div></div>
-        </div>`).join('')}
+  <div class="modern-home" id="captureArea">
+    <div class="home-hero card">
+      <div class="home-hero-logo"><img src="af-logic-logo.png" alt="AF LOGIC"></div>
+      <div class="home-hero-copy">
+        <div class="home-kicker">AF LOGIC</div>
+        <h1>${ar?'ROSTER — نظام تخطيط وتشغيل الموانئ':'ROSTER — PORT OPERATIONS & SHIFT PLANNING'}</h1>
+        <p>${ar?'واجهة تشغيل حديثة لإدارة الأوناش والونّاشين والمعدات والمراكب والتقسيمات اليومية.':'Modern control center for cranes, operators, equipment, vessels and daily team assignments.'}</p>
       </div>
-      <div class="zhint"><span class="wheel-ic"></span> <span>مرّر بعجلة الماوس أو اسحب للتنقل</span></div>
     </div>
+    <div class="main-menu-grid">
+      ${TABS.map((t,i)=>`
+        <button class="main-menu-card" onclick="switchTab('${t.id}')">
+          <span class="main-menu-number">${String(i+1).padStart(2,'0')}</span>
+          <span class="main-menu-icon">${t.icon}</span>
+          <span class="main-menu-title">${esc(tTab(t.id))}</span>
+          <span class="main-menu-arrow">${ar?'←':'→'}</span>
+        </button>`).join('')}
+    </div>
+    <div class="home-note">${ar?'اختر القسم المطلوب من القائمة الرئيسية':'Select a module from the main menu'}</div>
   </div>`;
 }
 
@@ -2706,31 +2704,6 @@ function esc(str){
   return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;');
 }
 
-
-/* ============================================================
-   AF LOGIC GLOBAL SCROLL / SPLASH ENGINE
-   Applies to every existing roster page without changing routing.
-   ============================================================ */
-(function initAFGlobalUX(){
-  let raf = null;
-  function updateAFScroll(){
-    const doc = document.documentElement;
-    const max = Math.max(1, doc.scrollHeight - window.innerHeight);
-    const pct = Math.min(1, Math.max(0, window.scrollY / max));
-    const progress = document.getElementById('globalScrollProgress');
-    const rail = document.querySelector('#globalScrollRail span');
-    if(progress) progress.style.width = (pct*100).toFixed(2)+'%';
-    if(rail) rail.style.height = (pct*100).toFixed(2)+'%';
-    document.body.classList.toggle('af-scrolled', window.scrollY > 24);
-    raf = null;
-  }
-  window.addEventListener('scroll', ()=>{
-    if(!raf) raf=requestAnimationFrame(updateAFScroll);
-  }, {passive:true});
-  window.addEventListener('resize', updateAFScroll);
-  document.addEventListener('DOMContentLoaded', updateAFScroll);
-  setTimeout(updateAFScroll, 60);
-})();
 
 function hideAFSplash(){
   const splash=document.getElementById('splash-screen');
