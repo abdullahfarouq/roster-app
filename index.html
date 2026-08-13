@@ -1675,108 +1675,124 @@ function removeCrane(date,vId,crId){
 function buildRosterTableHTML(date){
   const roster = getRoster(date);
   const rows = [];
-  let hasLoader = false, hasFork = false;
+  const teams = roster.teamAssignments || [];
+  const assignedRefs = new Set(teams.flatMap(t => t.craneRefs || []));
+  let hasLoader = false, hasFork = false, hasHold = false, hasOps = false;
 
+  // Individual crane rows: hide any crane that already belongs to a team.
   roster.vessels.forEach(rv=>{
-    rv.cranes.forEach(cr=>{
-      const loaders = cr.equipment.filter(e=>e.type==='loader').map(e=>e.label.replace('لودر ',''));
-      const forks = cr.equipment.filter(e=>e.type==='fork').map(e=>e.label.replace('شوكة ',''));
-      hasLoader = hasLoader || loaders.length>0;
-      hasFork = hasFork || forks.length>0;
+    (rv.cranes||[]).forEach(cr=>{
+      const ref = `${rv.id}|${cr.id}`;
+      if(assignedRefs.has(ref)) return;
 
-      const opsTxt = cr.operators.map(oid=>{
-        const op = state.crew.operators.find(o=>o.id===oid);
-        if(!op || isOnLeave(op.name, date)) return null;
-        return op.name;
-      }).filter(Boolean).join(' - ');
+      const loaders = (cr.equipment||[]).filter(e=>e.type==='loader').map(e=>e.label.replace('لودر ',''));
+      const forks = (cr.equipment||[]).filter(e=>e.type==='fork').map(e=>e.label.replace('شوكة ',''));
+      const hold = cr.hold && cr.hold!=='-' ? String(cr.hold) : '';
+      const ops = (cr.operators||[]).map(oid=>state.crew.operators.find(o=>o.id===oid))
+        .filter(Boolean).filter(o=>!isOnLeave(o.name,date)).map(o=>o.name);
 
-      rows.push({
-        vessel: rv.name,
-        loader: loaders.join(' / '),
-        fork: forks.join(' / '),
-        hold: cr.hold && cr.hold!=='-' ? cr.hold : '',
-        ops: opsTxt,
-        team: false
-      });
+      const row = {
+        kind:'individual',
+        vessel: rv.name || '',
+        teamName:'',
+        loader: [...new Set(loaders)].join(' / '),
+        fork: [...new Set(forks)].join(' / '),
+        hold,
+        ops: ops.join(' - ')
+      };
+      rows.push(row);
+      hasLoader ||= !!row.loader;
+      hasFork ||= !!row.fork;
+      hasHold ||= !!row.hold;
+      hasOps ||= !!row.ops;
     });
   });
 
-  /* A multi-crane team is represented as ONE team row. Crane numbers are intentionally hidden. */
-  (roster.teamAssignments||[]).forEach(team=>{
+  // A team is ONE roster row. Its member vessels/crane numbers are never printed.
+  teams.forEach(team=>{
     const refs = (team.craneRefs||[]).map(ref=>{
       const [vId,crId] = String(ref).split('|');
       const v = roster.vessels.find(x=>x.id===vId);
-      const c = v && v.cranes.find(x=>x.id===crId);
+      const c = v && (v.cranes||[]).find(x=>x.id===crId);
       return v && c ? {v,c} : null;
     }).filter(Boolean);
     if(!refs.length) return;
 
-    const loaders = [], forks = [], holds = [], vessels = [];
-    refs.forEach(({v,c})=>{
-      if(v.name && !vessels.includes(v.name)) vessels.push(v.name);
-      if(c.hold && c.hold!=='-' && !holds.includes(String(c.hold))) holds.push(String(c.hold));
+    const loaders=[], forks=[], holds=[];
+    refs.forEach(({c})=>{
       (c.equipment||[]).forEach(e=>{
         if(e.type==='loader') loaders.push(e.label.replace('لودر ',''));
         if(e.type==='fork') forks.push(e.label.replace('شوكة ',''));
       });
+      if(c.hold && c.hold!=='-') holds.push(String(c.hold));
     });
-    hasLoader = hasLoader || loaders.length>0;
-    hasFork = hasFork || forks.length>0;
+
     const ops = (team.operatorIds||[])
       .map(id=>state.crew.operators.find(o=>o.id===id))
       .filter(Boolean)
       .filter(o=>!isOnLeave(o.name,date))
       .map(o=>o.name);
 
-    rows.push({
-      vessel: team.name || (currentLang()==='ar'?'فريق الوردية':'Shift Team'),
-      loader: [...new Set(loaders)].join(' / '),
-      fork: [...new Set(forks)].join(' / '),
-      hold: holds.join(' / '),
-      ops: ops.join(' - '),
-      team: true,
-      teamVessels: vessels.join(' / ')
-    });
+    const row = {
+      kind:'team',
+      // IMPORTANT: do not expose any member vessel name or crane number.
+      vessel:'',
+      teamName: team.name || (currentLang()==='ar'?'فريق الوردية':'Shift Team'),
+      loader:[...new Set(loaders)].join(' / '),
+      fork:[...new Set(forks)].join(' / '),
+      hold:[...new Set(holds)].join(' / '),
+      ops:ops.join(' - ')
+    };
+    rows.push(row);
+    hasLoader ||= !!row.loader;
+    hasFork ||= !!row.fork;
+    hasHold ||= !!row.hold;
+    hasOps ||= !!row.ops;
   });
 
   if(!rows.length){
-    return `<div class="empty muted">${currentLang()==='ar'?'لا توجد بيانات كافية لعرض جدول التقسيمة بعد':'Not enough roster data to display the roster table yet'}</div>`;
+    return `<div class="empty muted">${currentLang()==='ar'?'لا توجد بيانات فعلية لعرضها في جدول الروستر':'There is no actual roster data to display'}</div>`;
   }
 
   const ar = currentLang()==='ar';
   const shiftLabel = ar ? 'الوردية الثالثة' : 'Third Shift';
   const vesselHead = ar ? 'المركب' : 'Vessel';
+  const teamHead = ar ? 'الفريق / الوردية' : 'Team / Shift';
   const loaderHead = 'Loader';
   const forkHead = 'Forklift';
   const holdHead = ar ? 'العنبر' : 'Hold';
   const opHead = ar ? 'الونّاشين' : 'Crane Operators';
-  const teamHead = ar ? 'الوردية الثالثة' : 'Third Shift';
+
+  // Only create columns that actually contain data anywhere in the table.
+  // A team row deliberately has NO vessel column value because its member vessels are hidden.
+  const columns = [
+    {key:'identity', label:teamHead, values:rows.map(r=>r.kind==='team'?r.teamName:r.vessel), always:true},
+    {key:'loader', label:loaderHead, values:rows.map(r=>r.loader), enabled:hasLoader},
+    {key:'fork', label:forkHead, values:rows.map(r=>r.fork), enabled:hasFork},
+    {key:'hold', label:holdHead, values:rows.map(r=>r.hold), enabled:hasHold},
+    {key:'ops', label:opHead, values:rows.map(r=>r.ops), enabled:hasOps}
+  ].filter(c=>c.always || c.enabled);
 
   return `
   <div class="roster-export-shell">
     <table class="rt-table">
       <thead>
         <tr>
-          <th class="rt-team" rowspan="2">${teamHead}</th>
-          <th class="rt-title" colspan="${3 + (hasLoader?1:0) + (hasFork?1:0)}">ROSTER</th>
+          <th class="rt-team" rowspan="2">${shiftLabel}</th>
+          <th class="rt-title" colspan="${columns.length}">ROSTER</th>
         </tr>
         <tr>
-          <th>${vesselHead}<br><span class="rt-en">${ar?'Vessel':'Vessel'}</span></th>
-          ${hasLoader?`<th>${loaderHead}</th>`:''}
-          ${hasFork?`<th>${forkHead}</th>`:''}
-          <th>${holdHead}</th>
-          <th>${opHead}</th>
+          ${columns.map(c=>`<th>${c.label}</th>`).join('')}
         </tr>
       </thead>
       <tbody>
         ${rows.map((r,i)=>`
-          <tr class="${r.team?'team-row':''}">
-            ${i===0? `<td class="rt-team" rowspan="${rows.length}">${shiftLabel}</td>` : ''}
-            <td>${esc(r.team && r.teamVessels ? r.vessel : r.vessel)}</td>
-            ${hasLoader?`<td>${esc(r.loader||'')}</td>`:''}
-            ${hasFork?`<td>${esc(r.fork||'')}</td>`:''}
-            <td>${esc(r.hold||'')}</td>
-            <td class="rt-op">${esc(r.team ? (r.ops||r.vessel) : (r.ops||''))}</td>
+          <tr class="${r.kind==='team'?'team-row':''}">
+            ${i===0 ? `<td class="rt-team" rowspan="${rows.length}">${shiftLabel}</td>` : ''}
+            ${columns.map(c=>{
+              const value = c.key==='identity' ? (r.kind==='team'?r.teamName:r.vessel) : r[c.key];
+              return `<td>${esc(value||'')}</td>`;
+            }).join('')}
           </tr>`).join('')}
       </tbody>
     </table>
