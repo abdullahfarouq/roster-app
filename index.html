@@ -358,10 +358,10 @@ body.af-scrolled .topbar{padding-top:10px!important;padding-bottom:10px!importan
 .rt-table tbody tr:hover td{background:rgba(10,132,255,.07)!important;}
 .rt-table td.rt-crane{color:#6BE7FF!important;}
 .roster-brand-row{display:flex;align-items:center;gap:12px;padding:12px 14px;margin-bottom:10px;border:1px solid var(--af-border);border-radius:16px;background:rgba(255,255,255,.025);box-shadow:inset 0 1px 0 rgba(255,255,255,.08);}
-.roster-brand-row img{width:82px;height:82px;object-fit:contain;filter:drop-shadow(0 0 16px var(--af-blue-glow));}
+.roster-brand-row img{width:132px;height:132px;object-fit:contain;filter:drop-shadow(0 0 16px var(--af-blue-glow));}
 .roster-brand-copy{display:flex;flex-direction:column;gap:4px;}
-.roster-brand-copy strong{font-family:var(--af-font-en);font-size:.9rem;letter-spacing:1.5px;color:var(--af-cream);}
-.roster-brand-copy span{font-family:var(--af-font-en);font-size:.58rem;letter-spacing:1.6px;color:var(--af-blue);text-transform:uppercase;}
+.roster-brand-copy strong{font-family:var(--af-font-en);font-size:1.15rem;font-weight:900;letter-spacing:1.5px;color:var(--af-cream);}
+.roster-brand-copy span{font-family:var(--af-font-en);font-size:.82rem;font-weight:900;letter-spacing:2.6px;color:var(--af-blue);text-transform:uppercase;font-weight:900;}
 #globalScrollProgress{position:fixed;top:0;left:0;height:2px;width:0%;z-index:10001;background:linear-gradient(90deg,var(--af-blue),var(--af-red));box-shadow:0 0 14px rgba(10,132,255,.55),0 0 12px rgba(255,46,46,.25);pointer-events:none;transition:width .06s linear;}
 #globalScrollRail{position:fixed;right:7px;top:18%;height:64%;width:3px;border-radius:99px;background:rgba(255,255,255,.045);z-index:999;pointer-events:none;overflow:hidden;}
 [dir="rtl"] #globalScrollRail{right:auto;left:7px;}
@@ -1698,7 +1698,8 @@ function buildRosterTableHTML(date){
         loader: [...new Set(loaders)].join(' / '),
         fork: [...new Set(forks)].join(' / '),
         hold,
-        ops: ops.join(' - ')
+        ops: ops.join(' - '),
+        crane: cr.craneNumber || ''
       };
       rows.push(row);
       hasLoader ||= !!row.loader;
@@ -1765,12 +1766,33 @@ function buildRosterTableHTML(date){
 
   // Only create columns that actually contain data anywhere in the table.
   // A team row deliberately has NO vessel column value because its member vessels are hidden.
+  // TEAM: one row only. Keep the member crane numbers together in the team row.
+  // INDIVIDUAL: keep the vessel, crane number, operators and any entered equipment.
+  teams.forEach(team=>{
+    const refs=(team.craneRefs||[]).map(ref=>{
+      const [vId,crId]=String(ref).split('|');
+      const v=roster.vessels.find(x=>x.id===vId);
+      const c=v&&(v.cranes||[]).find(x=>x.id===crId);
+      return v&&c?{v,c}:null;
+    }).filter(Boolean);
+    const row=rows.find(r=>r.kind==='team' && r.teamName===(team.name || (ar?'فريق الوردية':'Shift Team')));
+    if(row){
+      row.vessel=[...new Set(refs.map(x=>x.v.name).filter(Boolean))].join(' / ');
+      row.crane=[...new Set(refs.map(x=>x.c.craneNumber).filter(Boolean))].join(' + ');
+    }
+  });
+
+  const craneHead = ar ? 'الونش' : 'Crane';
+
+  // Do NOT create empty columns. Loader/Forklift/Hold/Operators appear only
+  // when at least one real row contains data. Crane is always meaningful.
   const columns = [
-    {key:'identity', label:teamHead, values:rows.map(r=>r.kind==='team'?r.teamName:r.vessel), always:true},
-    {key:'loader', label:loaderHead, values:rows.map(r=>r.loader), enabled:hasLoader},
-    {key:'fork', label:forkHead, values:rows.map(r=>r.fork), enabled:hasFork},
-    {key:'hold', label:holdHead, values:rows.map(r=>r.hold), enabled:hasHold},
-    {key:'ops', label:opHead, values:rows.map(r=>r.ops), enabled:hasOps}
+    {key:'identity', label:vesselHead, always:true},
+    {key:'crane', label:craneHead, always:true},
+    {key:'loader', label:loaderHead, enabled:hasLoader},
+    {key:'fork', label:forkHead, enabled:hasFork},
+    {key:'hold', label:holdHead, enabled:hasHold},
+    {key:'ops', label:opHead, enabled:hasOps}
   ].filter(c=>c.always || c.enabled);
 
   return `
@@ -1790,7 +1812,7 @@ function buildRosterTableHTML(date){
           <tr class="${r.kind==='team'?'team-row':''}">
             ${i===0 ? `<td class="rt-team" rowspan="${rows.length}">${shiftLabel}</td>` : ''}
             ${columns.map(c=>{
-              const value = c.key==='identity' ? (r.kind==='team'?r.teamName:r.vessel) : r[c.key];
+              const value = c.key==='identity' ? r.vessel : r[c.key];
               return `<td>${esc(value||'')}</td>`;
             }).join('')}
           </tr>`).join('')}
@@ -2792,3 +2814,14 @@ window.onload = function(){
 </script>
 </body>
 </html>
+<style id="final-roster-sizing">
+.roster-export-shell{width:100%;overflow:visible}
+.rt-table{font-size:28px!important;min-width:1100px!important}
+.rt-table th{font-size:30px!important;padding:24px 28px!important;white-space:nowrap}
+.rt-table td{font-size:28px!important;padding:24px 28px!important;line-height:1.45!important;white-space:normal;vertical-align:middle}
+.rt-table .rt-team,.rt-table .rt-title{font-size:34px!important;font-weight:900!important}
+.roster-brand-row{min-height:150px!important;padding:18px 24px!important}
+.roster-brand-row img{width:132px!important;height:132px!important}
+.roster-brand-copy strong{font-size:1.2rem!important;font-weight:900!important}
+.roster-brand-copy span{font-size:.82rem!important;font-weight:900!important;letter-spacing:2.6px!important;text-transform:uppercase!important}
+</style>
