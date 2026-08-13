@@ -332,7 +332,7 @@ input:focus,select:focus,textarea:focus{border-color:rgba(10,132,255,.65)!import
 body.af-scrolled .topbar{padding-top:10px!important;padding-bottom:10px!important;background:rgba(12,12,16,.68)!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.12),0 16px 45px rgba(0,0,0,.35),0 0 28px rgba(10,132,255,.055);}
 .brand{gap:12px!important;}
 .brand .dot{width:10px!important;height:10px!important;background:var(--af-blue)!important;box-shadow:0 0 20px var(--af-blue-glow)!important;}
-.brand-logo{width:52px;height:52px;object-fit:contain;filter:drop-shadow(0 0 18px var(--af-blue-glow));}
+.brand-logo{width:64px;height:64px;object-fit:contain;filter:drop-shadow(0 0 18px var(--af-blue-glow));}
 .brand-meta{display:flex;flex-direction:column;line-height:1.05;}
 .brand-meta .brand-name{font-weight:900;font-size:1.05rem;letter-spacing:1.5px;color:var(--af-cream);}
 .brand-meta .brand-tagline{font-family:var(--af-font-en);font-size:.55rem;letter-spacing:1.35px;color:var(--af-blue);text-transform:uppercase;margin-top:5px;white-space:nowrap;}
@@ -358,7 +358,7 @@ body.af-scrolled .topbar{padding-top:10px!important;padding-bottom:10px!importan
 .rt-table tbody tr:hover td{background:rgba(10,132,255,.07)!important;}
 .rt-table td.rt-crane{color:#6BE7FF!important;}
 .roster-brand-row{display:flex;align-items:center;gap:12px;padding:12px 14px;margin-bottom:10px;border:1px solid var(--af-border);border-radius:16px;background:rgba(255,255,255,.025);box-shadow:inset 0 1px 0 rgba(255,255,255,.08);}
-.roster-brand-row img{width:58px;height:58px;object-fit:contain;filter:drop-shadow(0 0 16px var(--af-blue-glow));}
+.roster-brand-row img{width:82px;height:82px;object-fit:contain;filter:drop-shadow(0 0 16px var(--af-blue-glow));}
 .roster-brand-copy{display:flex;flex-direction:column;gap:4px;}
 .roster-brand-copy strong{font-family:var(--af-font-en);font-size:.9rem;letter-spacing:1.5px;color:var(--af-cream);}
 .roster-brand-copy span{font-family:var(--af-font-en);font-size:.58rem;letter-spacing:1.6px;color:var(--af-blue);text-transform:uppercase;}
@@ -381,13 +381,130 @@ body.af-scrolled .topbar{padding-top:10px!important;padding-bottom:10px!importan
 @media(max-width:760px){
   #app{padding-left:12px;padding-right:12px;}
   .topbar{top:8px;padding:10px 12px!important;}
-  .brand-logo{width:42px;height:42px;}
+  .brand-logo{width:50px;height:50px;}
   .brand-meta .brand-tagline{font-size:.48rem;letter-spacing:1px;}
   #globalScrollRail{display:none;}
   .roster-brand-row{padding:10px;}
   .roster-brand-row img{width:48px;height:48px;}
 }
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.001ms!important;transition-duration:.001ms!important;scroll-behavior:auto!important;}}
+
+
+/* ===== Arabic typography + roster export readability ===== */
+@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800;900&family=Noto+Naskh+Arabic:wght@400;500;600;700&display=swap');
+:root{
+  --af-font-ar:'Cairo','Noto Naskh Arabic','Geeza Pro','SF Arabic','Tahoma',Arial,sans-serif;
+  --roster-table-font-size:1.16rem;
+}
+html[lang="ar"], html[dir="rtl"], body[dir="rtl"]{
+  font-family:var(--af-font-ar)!important;
+}
+input,select,textarea,button,.tbt-box,.print-wrap,.rt-table,.excel-handover-table{
+  font-family:var(--af-font-ar)!important;
+  font-feature-settings:"kern" 1,"liga" 1;
+  text-rendering:optimizeLegibility;
+}
+textarea{
+  direction:rtl!important;
+  unicode-bidi:plaintext!important;
+  text-align:right!important;
+  white-space:pre-wrap!important;
+  word-break:normal!important;
+  overflow-wrap:anywhere!important;
+  line-height:2!important;
+  letter-spacing:0!important;
+  font-size:1.08rem!important;
+  min-height:130px!important;
+}
+.tbt-box{
+  overflow:visible!important;
+}
+.tbt-box textarea:focus{
+  transform:none!important;
+}
+.roster-brand-row{
+  min-height:88px!important;
+  padding:14px 18px!important;
+}
+.roster-brand-row img{
+  width:82px!important;
+  height:82px!important;
+}
+.roster-brand-copy strong{
+  color:#111!important;
+  font-size:1.35rem!important;
+  letter-spacing:2px!important;
+}
+.roster-brand-copy span{
+  font-size:.68rem!important;
+}
+.roster-export-shell{
+  width:100%;
+  overflow:visible;
+}
+.rt-table{
+  width:max-content!important;
+  min-width:100%!important;
+  table-layout:auto!important;
+  font-size:var(--roster-table-font-size)!important;
+}
+.rt-table th,.rt-table td{
+  padding:13px 16px!important;
+  line-height:1.55!important;
+  white-space:normal!important;
+  vertical-align:middle!important;
+}
+.rt-table .rt-title{
+  color:#111!important;
+  background:linear-gradient(180deg,#f4f4f4,#dcdcdc)!important;
+}
+.rt-table thead tr:first-child th.rt-team{
+  background:#111!important;
+  color:#fff!important;
+}
+.rt-table thead tr:nth-child(2) th{
+  background:#e8edf2!important;
+  color:#111!important;
+}
+.team-assignment-card{
+  margin-top:16px;
+  border:1px solid rgba(10,132,255,.22);
+  background:rgba(255,255,255,.025);
+}
+.multi-choice-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(220px,1fr));
+  gap:8px;
+  max-height:260px;
+  overflow:auto;
+  padding:8px;
+  border:1px solid var(--border);
+  border-radius:14px;
+  background:rgba(255,255,255,.025);
+}
+.choice-chip{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  padding:9px 11px;
+  border:1px solid var(--border);
+  border-radius:12px;
+  background:rgba(255,255,255,.035);
+  cursor:pointer;
+}
+.choice-chip:hover{border-color:rgba(10,132,255,.4);background:rgba(10,132,255,.06);}
+.choice-chip input{width:auto;transform:none!important;box-shadow:none!important;}
+.team-summary{
+  display:flex;
+  flex-wrap:wrap;
+  gap:6px;
+  margin-top:10px;
+}
+@media(max-width:760px){
+  .roster-brand-row img{width:68px!important;height:68px!important;}
+  .rt-table{font-size:1.02rem!important;}
+  .rt-table th,.rt-table td{padding:11px 12px!important;}
+}
 
 </style>
 </head>
@@ -1187,8 +1304,9 @@ function currentRosterDate(){
   return el ? el.value : todayStr();
 }
 function getRoster(date){
-  if(!state.rosterDates[date]) state.rosterDates[date] = {vessels:[], tbt:'', otherTasks:[]};
+  if(!state.rosterDates[date]) state.rosterDates[date] = {vessels:[], tbt:'', otherTasks:[], teamAssignments:[]};
   if(!state.rosterDates[date].otherTasks) state.rosterDates[date].otherTasks = [];
+  if(!state.rosterDates[date].teamAssignments) state.rosterDates[date].teamAssignments = [];
   return state.rosterDates[date];
 }
 function viewRoster(){
@@ -1208,7 +1326,7 @@ function viewRoster(){
 
   <div class="tbt-box">
     <h3 style="margin-bottom:8px;">📋 تعليمات TBT (Toolbox Talk)</h3>
-    <textarea id="tbtNote" dir="rtl" placeholder="اكتب هنا بنود وتعليمات السلامة والتعليمات الفنية قبل بدء العمل..." onchange="updateTBT(this.value, '${esc(date)}')">${esc(roster.tbt||'')}</textarea>
+    <textarea id="tbtNote" dir="rtl" lang="ar" placeholder="اكتب هنا بنود وتعليمات السلامة والتعليمات الفنية قبل بدء العمل..." onchange="updateTBT(this.value, '${esc(date)}')">${esc(roster.tbt||'')}</textarea>
   </div>
 
   <div class="card" style="margin-bottom:16px;">
@@ -1229,7 +1347,7 @@ function viewRoster(){
   </div>
 
   ${renderRosterVessels(date)}
-  </div>
+  ${renderTeamAssignments(date)}
 
   <div class="row" style="justify-content:space-between;margin-top:22px;margin-bottom:10px;">
     <h3 style="margin:0;">جدول الروستر المدمج (للتصدير كصورة)</h3>
@@ -1268,7 +1386,7 @@ function viewRoster(){
       </div>
     </div>
   </div>
-  `;
+  </div>`;
 }
 
 function updateShiftName(v){ state.shiftName=v.trim()||state.shiftName; saveState(); }
@@ -1330,10 +1448,27 @@ function addVesselToRoster(date){
   saveState(); renderTab();
 }
 
+function getAssignedCraneNumbers(date, exceptVId='', exceptCrId=''){
+  const roster = getRoster(date);
+  const used = new Set();
+  roster.vessels.forEach(v=>{
+    (v.cranes||[]).forEach(c=>{
+      if(v.id===exceptVId && c.id===exceptCrId) return;
+      if(c.craneNumber && c.craneNumber!=='-') used.add(String(c.craneNumber));
+    });
+  });
+  return used;
+}
+function getAvailableMasterCranes(date, exceptVId='', exceptCrId=''){
+  const used = getAssignedCraneNumbers(date, exceptVId, exceptCrId);
+  return (state.crew.cranes||[]).filter(c=>!used.has(String(c.number)));
+}
 function renderRosterVessels(date){
   const roster = getRoster(date);
   if(!roster.vessels.length) return `<div class="empty muted">لم تتم إضافة أي مركب لهذا اليوم بعد</div>`;
-  return roster.vessels.map(rv=>`
+  return roster.vessels.map(rv=>{
+    const available = getAvailableMasterCranes(date);
+    return `
     <div class="card" style="margin-bottom:14px;">
       <div class="row" style="justify-content:space-between; align-items:center; margin-bottom:12px;">
         <h2 style="margin:0; font-size:1.2rem; color:var(--gold);">${esc(rv.name)}</h2>
@@ -1346,8 +1481,9 @@ function renderRosterVessels(date){
             <label>اختر رقم الونش</label>
             <select id="craneNum-${esc(rv.id)}">
               <option value="">-- اختر الونش --</option>
-              ${(state.crew.cranes||[]).map(c=>`<option value="${esc(c.number)}">ونش ${esc(c.number)}</option>`).join('')}
+              ${available.map(c=>`<option value="${esc(c.number)}">ونش ${esc(c.number)}</option>`).join('')}
             </select>
+            ${!available.length?'<div class="muted" style="margin-top:6px;">لا توجد أوناش متاحة؛ الأوناش المستخدمة في هذه التقسيمة مخفية تلقائياً.</div>':''}
           </div>
           <div class="field" style="margin-bottom:0;">
             <label>رقم العنبر (من 1 إلى 9)</label>
@@ -1361,34 +1497,35 @@ function renderRosterVessels(date){
       </div>
 
       ${rv.cranes.length? rv.cranes.map(cr=>renderCrane(date,rv.id,cr)).join('') : `<div class="muted" style="padding:10px 0;">لا يوجد أوناش مضافة لهذا المركب بعد. أضف ونش من النموذج أعلاه.</div>`}
-    </div>`).join('');
+    </div>`}).join('');
 }
 
 function addCraneInline(date, vId){
   const numSelect = document.getElementById(`craneNum-${vId}`);
   const holdSelect = document.getElementById(`craneHold-${vId}`);
   if(!numSelect) return;
-
   const craneNumber = numSelect.value.trim();
   const hold = holdSelect ? holdSelect.value.trim() : '';
-
-  if(!craneNumber){
-    alert('من فضلك اختر رقم الونش أولاً');
-    return;
-  }
+  if(!craneNumber){ alert('من فضلك اختر رقم الونش أولاً'); return; }
 
   const roster = getRoster(date);
   const rv = roster.vessels.find(v=>v.id===vId);
   if(!rv) return;
 
+  const duplicate = roster.vessels.some(v=>(v.cranes||[]).some(c=>String(c.craneNumber)===String(craneNumber)));
+  if(duplicate){
+    alert('هذا الونش تم اختياره بالفعل في نفس تقسيمة اليوم ولا يمكن اختياره مرتين.');
+    renderTab();
+    return;
+  }
+
   rv.cranes.push({
     id: uid(),
-    craneNumber: craneNumber,
+    craneNumber,
     hold: hold || '-',
     operators: [],
     equipment: []
   });
-
   saveState();
   renderTab();
 }
@@ -1409,7 +1546,42 @@ function updateCraneField(date,vId,crId,field,value){
   saveState(); renderTab();
 }
 
+function getAssignedEquipmentIds(date, exceptVId='', exceptCrId=''){
+  const roster=getRoster(date);
+  const ids=new Set();
+  roster.vessels.forEach(v=>(v.cranes||[]).forEach(c=>{
+    if(v.id===exceptVId && c.id===exceptCrId) return;
+    (c.equipment||[]).forEach(e=>{ if(e.refId) ids.add(e.refId); });
+  }));
+  return ids;
+}
+function getAssignedOperatorIds(date, exceptVId='', exceptCrId=''){
+  const roster = getRoster(date);
+  const ids = new Set();
+  roster.vessels.forEach(v=>{
+    (v.cranes||[]).forEach(c=>{
+      if(v.id===exceptVId && c.id===exceptCrId) return;
+      (c.operators||[]).forEach(id=>ids.add(id));
+    });
+  });
+  (roster.teamAssignments||[]).forEach(team=>{
+    (team.operatorIds||[]).forEach(id=>ids.add(id));
+  });
+  return ids;
+}
 function renderCrane(date,vId,cr){
+  const assignedElsewhere = getAssignedOperatorIds(date, vId, cr.id);
+  const availableOps = state.crew.operators.filter(o=>
+    !isOnLeave(o.name,date) &&
+    !assignedElsewhere.has(o.id) &&
+    !cr.operators.includes(o.id)
+  );
+  const assignedEquipElsewhere = getAssignedEquipmentIds(date, vId, cr.id);
+  const availableEquip = [
+    ...(state.crew.loaders||[]).map(l=>({type:'loader',id:l.id,number:l.number,label:'لودر '+l.number})),
+    ...(state.crew.forklifts||[]).map(f=>({type:'fork',id:f.id,number:f.number,label:'شوكة '+f.number}))
+  ].filter(e=>!assignedEquipElsewhere.has(e.id) && !cr.equipment.some(x=>x.refId===e.id));
+
   return `
   <div class="crane-block">
     <div class="row" style="justify-content:space-between;align-items:flex-end;">
@@ -1418,7 +1590,7 @@ function renderCrane(date,vId,cr){
           <label>رقم الونش (Crane)</label>
           <select onchange="updateCraneField('${esc(date)}','${esc(vId)}','${esc(cr.id)}','craneNumber',this.value)">
             <option value="">-- اختر الونش --</option>
-            ${(state.crew.cranes||[]).map(c=>`<option value="${esc(c.number)}" ${cr.craneNumber===c.number?'selected':''}>ونش ${esc(c.number)}</option>`).join('')}
+            ${[...((state.crew.cranes||[]).filter(c=>c.number===cr.craneNumber)), ...getAvailableMasterCranes(date,vId,cr.id)].filter((c,i,a)=>a.findIndex(x=>x.number===c.number)===i).map(c=>`<option value="${esc(c.number)}" ${String(cr.craneNumber)===String(c.number)?'selected':''}>ونش ${esc(c.number)}</option>`).join('')}
           </select>
         </div>
         <div class="field" style="margin-bottom:0;max-width:150px;">
@@ -1431,31 +1603,31 @@ function renderCrane(date,vId,cr){
       </div>
       <button class="btn-danger btn-sm" onclick="removeCrane('${esc(date)}','${esc(vId)}','${esc(cr.id)}')">حذف الونش</button>
     </div>
-    
+
     <div style="margin:12px 0;">
       <label>الوناشين المعينين لهذا الونش</label>
       <div style="margin-bottom:8px;">${cr.operators.map(oid=>{
         const op = state.crew.operators.find(o=>o.id===oid);
         return op? `<span class="chip">${esc(op.name)} <button onclick="unassignOperator('${esc(date)}','${esc(vId)}','${esc(cr.id)}','${esc(oid)}')">✕</button></span>` : '';
       }).join('') || '<span class="muted">لا يوجد ونّاشين تعينوا بعد</span>'}</div>
-      
+
       <div class="row">
-        <select id="opInput-${esc(cr.id)}" style="max-width:240px;">
+        <select id="opInput-${esc(cr.id)}" style="max-width:300px;">
           <option value="">-- اختر مشغل --</option>
-          ${state.crew.operators.filter(o=>!isOnLeave(o.name,date) && !cr.operators.includes(o.id)).map(o=>`<option value="${esc(o.name)}">${esc(o.name)}</option>`).join('')}
+          ${availableOps.map(o=>`<option value="${esc(o.name)}">${esc(o.name)}${o.rating?' — '+esc(o.rating):''}</option>`).join('')}
         </select>
         <button class="btn-ghost btn-sm" onclick="assignOperatorText('${esc(date)}','${esc(vId)}','${esc(cr.id)}')">إضافة</button>
+        ${!availableOps.length?'<span class="muted">لا يوجد مشغل متاح لهذا اليوم (إجازة/مأمورية/كورس أو معين بالفعل).</span>':''}
       </div>
     </div>
 
     <div style="margin:10px 0;">
-      <label>المعدة المخصصة</label>
-      <div>${cr.equipment.map((eq,i)=>`<span class="chip">${esc(eq.label)} <button onclick="removeEquipFromCrane('${esc(date)}','${esc(vId)}','${esc(cr.id)}',${i})">✕</button></span>`).join('') || '<span class="muted">لا يوجد معدات مخصصة</span>'}</div>
+      <label>المعدة المخصصة داخل العنبر</label>
+      <div>${cr.equipment.map((eq,i)=>`<span class="chip">${esc(eq.label)} <button onclick="removeEquipFromCrane('${esc(date)}','${esc(vId)}','${esc(cr.id)}',${i})">✕</button></span>`).join('') || '<span class="muted">لا توجد معدة مخصصة — لن تظهر في جدول الروستر النهائي.</span>'}</div>
       <div class="row" style="margin-top:6px;">
         <select id="eqSel-${esc(cr.id)}">
           <option value="">-- اختر معدة من الطاقم --</option>
-          ${state.crew.loaders.map(l=>`<option value="loader:${esc(l.id)}:${esc(l.number)}">لودر ${esc(l.number)}</option>`).join('')}
-          ${state.crew.forklifts.map(f=>`<option value="fork:${esc(f.id)}:${esc(f.number)}">شوكة ${esc(f.number)}</option>`).join('')}
+          ${availableEquip.map(e=>`<option value="${e.type}:${esc(e.id)}:${esc(e.number)}">${esc(e.label)}</option>`).join('')}
         </select>
         <button class="btn-ghost btn-sm" onclick="assignEquipFromSelect('${esc(date)}','${esc(vId)}','${esc(cr.id)}')">إضافة</button>
       </div>
@@ -1474,40 +1646,79 @@ function removeCrane(date,vId,crId){
 function buildRosterTableHTML(date){
   const roster = getRoster(date);
   const rows = [];
+  let hasLoader = false, hasFork = false;
+
   roster.vessels.forEach(rv=>{
     rv.cranes.forEach(cr=>{
-      const loaderTxt = cr.equipment.filter(e=>e.type==='loader').map(e=>e.label.replace('لودر ','')).join(' / ') || '-';
+      const loaders = cr.equipment.filter(e=>e.type==='loader').map(e=>e.label.replace('لودر ',''));
+      const forks = cr.equipment.filter(e=>e.type==='fork').map(e=>e.label.replace('شوكة ',''));
+      hasLoader = hasLoader || loaders.length>0;
+      hasFork = hasFork || forks.length>0;
+
       const opsTxt = cr.operators.map(oid=>{
         const op = state.crew.operators.find(o=>o.id===oid);
         if(!op || isOnLeave(op.name, date)) return null;
         return op.name;
-      }).filter(Boolean).join(' - ') || '-';
+      }).filter(Boolean).join(' - ');
+
       rows.push({
         vessel: rv.name,
-        loader: loaderTxt,
-        hold: cr.hold||'-',
+        loader: loaders.join(' / '),
+        fork: forks.join(' / '),
+        hold: cr.hold && cr.hold!=='-' ? cr.hold : '',
         ops: opsTxt,
-        crane: cr.craneNumber||'-'
+        crane: cr.craneNumber||''
       });
     });
   });
 
+  /* Team assignments: one row can cover multiple cranes/holds/operators. */
+  (roster.teamAssignments||[]).forEach(team=>{
+    const refs = (team.craneRefs||[]).map(ref=>{
+      const [vId,crId] = String(ref).split('|');
+      const v = roster.vessels.find(x=>x.id===vId);
+      const c = v && v.cranes.find(x=>x.id===crId);
+      return v && c ? {v,c} : null;
+    }).filter(Boolean);
+    if(!refs.length) return;
+    const loaders = [];
+    const forks = [];
+    refs.forEach(({c})=>{
+      (c.equipment||[]).forEach(e=>{
+        if(e.type==='loader') loaders.push(e.label.replace('لودر ',''));
+        if(e.type==='fork') forks.push(e.label.replace('شوكة ',''));
+      });
+    });
+    hasLoader = hasLoader || loaders.length>0;
+    hasFork = hasFork || forks.length>0;
+    const ops = (team.operatorIds||[]).map(id=>state.crew.operators.find(o=>o.id===id)).filter(Boolean).filter(o=>!isOnLeave(o.name,date)).map(o=>o.name);
+    rows.push({
+      vessel: team.name || 'تقسيمة فريق',
+      loader: [...new Set(loaders)].join(' / '),
+      fork: [...new Set(forks)].join(' / '),
+      hold: refs.map(x=>x.c.hold).filter(x=>x && x!=='-').join(' / '),
+      ops: ops.join(' - '),
+      crane: refs.map(x=>'ونش '+x.c.craneNumber).join(' / ')
+    });
+  });
+
   if(!rows.length){
-    return `<div class="empty muted">لا توجد بيانات كافية لعرض جدول التقسيمة بعد (أضف ونش واحد على الأقل)</div>`;
+    return `<div class="empty muted">لا توجد بيانات كافية لعرض جدول التقسيمة بعد (أضف ونشاً أو تقسيمة فريق واحدة على الأقل)</div>`;
   }
 
   const teamLabel = esc(state.shiftName||'');
   return `
-  <div style="overflow-x:auto;border-radius:10px;">
+  <div class="roster-export-shell">
     <table class="rt-table">
       <thead>
         <tr>
           <th class="rt-team" rowspan="2">تقسيمة الوناشة</th>
-          <th class="rt-title" colspan="5">Crane Operator Shift Roster</th>
+          <th class="rt-title" colspan="${3 + (hasLoader?1:0) + (hasFork?1:0)}">Crane Operator Shift Roster</th>
         </tr>
         <tr>
           <th>المركب<br><span class="rt-en">Vessel</span></th>
-          <th>Loader</th>
+          ${hasLoader?'<th>Loader</th>':''}
+          ${hasFork?'<th>Forklift</th>':''}
           <th>Hold</th>
           <th>Crane Operator</th>
           <th>Crane</th>
@@ -1518,7 +1729,8 @@ function buildRosterTableHTML(date){
           <tr>
             ${i===0? `<td class="rt-team" rowspan="${rows.length}">${esc(teamLabel)}</td>` : ''}
             <td>${esc(r.vessel)}</td>
-            <td>${esc(r.loader)}</td>
+            ${hasLoader?`<td>${esc(r.loader)}</td>`:''}
+            ${hasFork?`<td>${esc(r.fork)}</td>`:''}
             <td>${esc(r.hold)}</td>
             <td class="rt-op">${esc(r.ops)}</td>
             <td class="rt-crane">${esc(r.crane)}</td>
@@ -1526,6 +1738,93 @@ function buildRosterTableHTML(date){
       </tbody>
     </table>
   </div>`;
+}
+
+/* ===== Multi-crane / multi-hold team assignment ===== */
+function getRosterCraneRefs(date){
+  const roster=getRoster(date);
+  const refs=[];
+  roster.vessels.forEach(v=>(v.cranes||[]).forEach(c=>refs.push({
+    value:`${v.id}|${c.id}`,
+    label:`ونش ${c.craneNumber||'-'} — ${v.name}${c.hold&&c.hold!=='-'?' — عنبر '+c.hold:''}`
+  })));
+  return refs;
+}
+function renderTeamAssignments(date){
+  const roster=getRoster(date);
+  const allRefs=getRosterCraneRefs(date);
+  const assignedTeamRefs=new Set((roster.teamAssignments||[]).flatMap(t=>t.craneRefs||[]));
+  const refs=allRefs.filter(r=>!assignedTeamRefs.has(r.value));
+  const assignedOps=getAssignedOperatorIds(date);
+  const availableOps=state.crew.operators.filter(o=>!isOnLeave(o.name,date)&&!assignedOps.has(o.id));
+  const ar=currentLang()==='ar';
+  return `
+  <div class="card team-assignment-card">
+    <div class="row" style="justify-content:space-between;align-items:center;">
+      <div>
+        <h3 style="margin:0;">👥 تقسيمة فريق — أكثر من ونش / أكثر من عنبر</h3>
+        <div class="muted" style="margin-top:5px;">اختَر عدة أوناش وعنابر ومجموعة ونّاشين ليعملوا كفريق واحد. أي ونّاش أو ونش مستخدم بالفعل لن يظهر للاختيار.</div>
+      </div>
+    </div>
+    <div class="g2" style="margin-top:12px;">
+      <div class="field">
+        <label>اسم الفريق / التقسيمة</label>
+        <input id="teamName-${esc(date)}" placeholder="مثال: فريق الوناشة 1">
+      </div>
+      <div class="field">
+        <label>الأوناش والعنابر المطلوبة</label>
+        <div class="multi-choice-grid" id="teamCraneChoices-${esc(date)}">
+          ${refs.length?refs.map(r=>`<label class="choice-chip"><input type="checkbox" name="teamCrane-${esc(date)}" value="${esc(r.value)}"> <span>${esc(r.label)}</span></label>`).join(''):'<span class="muted">أضف أوناشاً للمركب أولاً.</span>'}
+        </div>
+      </div>
+    </div>
+    <div class="field" style="margin-top:12px;">
+      <label>اختيار فريق الونّاشين</label>
+      <div class="multi-choice-grid" id="teamOperatorChoices-${esc(date)}">
+        ${availableOps.length?availableOps.map(o=>`<label class="choice-chip"><input type="checkbox" name="teamOperator-${esc(date)}" value="${esc(o.id)}"> <span>${esc(o.name)}${o.rating?' — '+esc(o.rating):''}</span></label>`).join(''):'<span class="muted">لا يوجد ونّاشون متاحون لهذا اليوم؛ الإجازة/المأمورية/الكورس والمستخدمون بالفعل مستبعدون.</span>'}
+      </div>
+    </div>
+    <button class="btn-gold" style="margin-top:12px;" onclick="addTeamAssignment('${esc(date)}')">+ إضافة التقسيمة الجماعية</button>
+    ${roster.teamAssignments.length?`
+      <div class="divider"></div>
+      ${roster.teamAssignments.map(t=>`
+        <div class="list-item">
+          <div>
+            <b>${esc(t.name||'تقسيمة فريق')}</b>
+            <div class="team-summary">
+              ${(t.craneRefs||[]).map(ref=>{
+                const r=refs.find(x=>x.value===ref); return r?`<span class="chip">${esc(r.label)}</span>`:'';
+              }).join('')}
+              ${(t.operatorIds||[]).map(id=>{
+                const o=state.crew.operators.find(x=>x.id===id); return o?`<span class="chip">${esc(o.name)}</span>`:'';
+              }).join('')}
+            </div>
+          </div>
+          <button class="btn-danger btn-sm" onclick="deleteTeamAssignment('${esc(date)}','${esc(t.id)}')">حذف</button>
+        </div>`).join('')}
+    `:''}
+  </div>`;
+}
+function addTeamAssignment(date){
+  const roster=getRoster(date);
+  const name=(document.getElementById(`teamName-${date}`)?.value||'').trim()||'تقسيمة فريق';
+  const craneRefs=[...document.querySelectorAll(`input[name="teamCrane-${date}"]:checked`)].map(x=>x.value);
+  const operatorIds=[...document.querySelectorAll(`input[name="teamOperator-${date}"]:checked`)].map(x=>x.value);
+  if(!craneRefs.length){alert('اختر ونشاً واحداً على الأقل.');return;}
+  if(!operatorIds.length){alert('اختر ونّاشاً واحداً على الأقل.');return;}
+  const assigned=getAssignedOperatorIds(date);
+  if(operatorIds.some(id=>assigned.has(id))){
+    alert('أحد الونّاشين تم تعيينه بالفعل على ونش آخر أو تقسيمة فريق أخرى.'); renderTab(); return;
+  }
+  const team={id:uid(),name,craneRefs,operatorIds};
+  roster.teamAssignments.push(team);
+  log('روستر','إضافة تقسيمة جماعية',null,{date,team});
+  saveState(); renderTab();
+}
+function deleteTeamAssignment(date,id){
+  const roster=getRoster(date);
+  roster.teamAssignments=roster.teamAssignments.filter(t=>t.id!==id);
+  saveState(); renderTab();
 }
 
 function buildOtherTasksPrintHTML(date){
@@ -1566,25 +1865,32 @@ function shareRosterTable(date){
 }
 
 function assignOperatorText(date, vId, crId) {
-    const input = document.getElementById(`opInput-${crId}`);
-    if(!input) return;
-    const opName = input.value.trim();
-    if(!opName) return;
+  const input = document.getElementById(`opInput-${crId}`);
+  if(!input) return;
+  const opName = input.value.trim();
+  if(!opName) return;
 
-    let op = state.crew.operators.find(o => o.name === opName);
-    if(!op) {
-        op = { id: uid(), name: opName, rating: '' };
-        state.crew.operators.push(op);
-    }
+  const op = state.crew.operators.find(o => o.name === opName);
+  if(!op) return;
+  if(isOnLeave(op.name,date)){
+    alert('هذا المشغل لديه إجازة / مأمورية / كورس في هذا اليوم ولا يمكن تعيينه.');
+    renderTab(); return;
+  }
 
-    const roster = getRoster(date);
-    const cr = roster.vessels.find(v=>v.id===vId).cranes.find(c=>c.id===crId);
-    if(!cr.operators.includes(op.id)) {
-        cr.operators.push(op.id);
-        log('روستر', 'تعيين ونّاش', null, {vId, crId, opName});
-    }
-    input.value = '';
-    saveState(); renderTab();
+  const assigned = getAssignedOperatorIds(date, vId, crId);
+  if(assigned.has(op.id)){
+    alert('هذا المشغل معين بالفعل على ونش آخر أو داخل تقسيمة فريق أخرى.');
+    renderTab(); return;
+  }
+
+  const roster = getRoster(date);
+  const cr = roster.vessels.find(v=>v.id===vId).cranes.find(c=>c.id===crId);
+  if(!cr.operators.includes(op.id)) {
+    cr.operators.push(op.id);
+    log('روستر', 'تعيين ونّاش', null, {vId, crId, opName});
+  }
+  input.value = '';
+  saveState(); renderTab();
 }
 
 function unassignOperator(date,vId,crId,opId){
@@ -1596,11 +1902,14 @@ function unassignOperator(date,vId,crId,opId){
 
 function assignEquipFromSelect(date,vId,crId){
   const sel = document.getElementById(`eqSel-${crId}`);
-  const val = sel.value;
+  const val = sel ? sel.value : '';
   if(!val) return;
   const [type,id,number] = val.split(':');
   const roster = getRoster(date);
   const cr = roster.vessels.find(v=>v.id===vId).cranes.find(c=>c.id===crId);
+  if(cr.equipment.some(e=>e.refId===id)){
+    renderTab(); return;
+  }
   cr.equipment.push({label:(type==='loader'?'لودر ':'شوكة ')+number, refId:id, type});
   saveState(); renderTab();
 }
@@ -2275,39 +2584,56 @@ function clearLocalData(){
 function shareElement(elementId, filename, bgOverride){
   const el = document.getElementById(elementId);
   if(!el){ alert('عنصر التصدير غير موجود'); return; }
-  
-  const originalBackground = el.style.background;
-  if(bgOverride) el.style.background = bgOverride;
 
+  const originalBackground = el.style.background;
   const originalWidth = el.style.width;
   const originalMaxWidth = el.style.maxWidth;
-  el.style.width = '1200px';
-  el.style.maxWidth = 'none';
+  const originalOverflow = el.style.overflow;
+  if(bgOverride) el.style.background = bgOverride;
 
-  html2canvas(el, {scale:2, useCORS:true, backgroundColor: bgOverride || null, windowWidth: 1400}).then(canvas=>{
-    el.style.background = originalBackground;
-    el.style.width = originalWidth;
-    el.style.maxWidth = originalMaxWidth;
-    
-    canvas.toBlob(blob=>{
-      if(!blob){ alert('تعذر توليد الصورة'); return; }
-      const file = new File([blob], filename, {type:'image/png'});
-      if(navigator.canShare && navigator.canShare({files:[file]})){
-        navigator.share({files:[file], title:'Roster Report', text:'مشاركة تقرير الروستر'}).catch(err=>{
-          if(err.name !== 'AbortError') downloadCanvas(canvas, filename);
-        });
-      } else {
-        downloadCanvas(canvas, filename);
-      }
+  /* Expand to the complete table before html2canvas so no column is clipped. */
+  const naturalWidth = Math.max(1200, el.scrollWidth, el.getBoundingClientRect().width);
+  el.style.width = Math.ceil(naturalWidth) + 'px';
+  el.style.maxWidth = 'none';
+  el.style.overflow = 'visible';
+
+  requestAnimationFrame(()=>{
+    html2canvas(el, {
+      scale: 2.4,
+      useCORS: true,
+      backgroundColor: bgOverride || null,
+      windowWidth: Math.max(window.innerWidth, Math.ceil(naturalWidth) + 80),
+      scrollX: 0,
+      scrollY: -window.scrollY,
+      logging: false
+    }).then(canvas=>{
+      el.style.background = originalBackground;
+      el.style.width = originalWidth;
+      el.style.maxWidth = originalMaxWidth;
+      el.style.overflow = originalOverflow;
+
+      canvas.toBlob(blob=>{
+        if(!blob){ alert('تعذر توليد الصورة'); return; }
+        const file = new File([blob], filename, {type:'image/png'});
+        if(navigator.canShare && navigator.canShare({files:[file]})){
+          navigator.share({files:[file], title:'Roster Report', text:'مشاركة تقرير الروستر'}).catch(err=>{
+            if(err.name !== 'AbortError') downloadCanvas(canvas, filename);
+          });
+        } else {
+          downloadCanvas(canvas, filename);
+        }
+      });
+    }).catch(err=>{
+      el.style.background = originalBackground;
+      el.style.width = originalWidth;
+      el.style.maxWidth = originalMaxWidth;
+      el.style.overflow = originalOverflow;
+      console.error(err);
+      alert('حدث خطأ أثناء تصدير الصورة');
     });
-  }).catch(err=>{
-    el.style.background = originalBackground;
-    el.style.width = originalWidth;
-    el.style.maxWidth = originalMaxWidth;
-    console.error(err);
-    alert('حدث خطأ أثناء تصدير الصورة');
   });
 }
+
 function downloadCanvas(canvas, filename){
   const link = document.createElement('a');
   link.download = filename;
