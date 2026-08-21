@@ -538,7 +538,7 @@ body{font-family:var(--font-ar),"Cairo","Noto Naskh Arabic","Geeza Pro",sans-ser
 .print-tbt p{font-size:1.65rem!important;line-height:1.9!important;}
 .roster-print-header{display:grid;grid-template-columns:1fr 1.35fr 1fr;align-items:center;gap:24px;margin-bottom:26px;direction:ltr;}
 .roster-print-header .rph-logo{display:flex;align-items:center;justify-content:flex-start;}
-.roster-print-header .rph-logo img{width:150px;height:150px;object-fit:contain;display:block;}
+.roster-print-header .rph-logo img{width:180px;height:180px;object-fit:contain;display:block;image-rendering:-webkit-optimize-contrast;image-rendering:crisp-edges;}
 .roster-print-header .rph-title{text-align:center;color:#000;font-size:3.2rem;font-weight:900;letter-spacing:2px;line-height:1.05;}
 .roster-print-header .rph-meta{text-align:right;direction:rtl;color:#111;}
 .roster-print-header .rph-meta .shift{font-size:2rem;font-weight:900;line-height:1.3;}
@@ -565,6 +565,21 @@ body{font-family:var(--font-ar),"Cairo","Noto Naskh Arabic","Geeza Pro",sans-ser
 .roster-tagline{display:block!important;font-family:var(--af-font-en)!important;font-size:18px!important;font-weight:1000!important;letter-spacing:2.6px!important;text-transform:uppercase!important;color:#0A84FF!important;white-space:nowrap!important;margin-top:4px!important;line-height:1.2!important;}
 .roster-brand-copy strong{text-transform:uppercase!important;color:#111!important;}
 @media(max-width:760px){.brand-stack .brand-logo{width:72px!important;height:72px!important}.brand-stack .brand-tagline{font-size:.58rem!important;letter-spacing:1.5px!important}.roster-brand-row img{width:100px!important;height:100px!important}.roster-tagline{font-size:12px!important;letter-spacing:1.4px!important}.roster-logo-block{min-width:120px!important}}
+</style>
+<style id="final-roster-sizing">
+/* Base/fallback sizing for the shared .rt-table (roster + berth plan).
+   Actual per-render sizing is computed live by applyDynamicTableSizing()
+   in JS so the table always matches how much data is in it; these rules
+   are just the floor/fallback before that JS runs (e.g. first paint). */
+.roster-export-shell{width:100%;overflow:visible}
+.rt-table{font-size:26px!important;min-width:1100px!important}
+.rt-table th{font-size:28px!important;padding:22px 26px!important;white-space:nowrap}
+.rt-table td{font-size:26px!important;padding:22px 26px!important;line-height:1.45!important;white-space:normal;vertical-align:middle}
+.rt-table .rt-team,.rt-table .rt-title{font-size:32px!important;font-weight:900!important}
+.roster-brand-row{min-height:170px!important;padding:20px 26px!important}
+.roster-brand-row img{width:160px!important;height:160px!important;object-fit:contain!important;image-rendering:-webkit-optimize-contrast;image-rendering:crisp-edges;}
+.roster-brand-copy strong{font-size:1.35rem!important;font-weight:900!important}
+.roster-brand-copy span{font-size:.86rem!important;font-weight:900!important;letter-spacing:2.6px!important;text-transform:uppercase!important}
 </style>
 </head>
 <body>
@@ -791,6 +806,58 @@ function renderTab(){
   else if(currentTab==='handover') c.innerHTML = viewHandover();
   else if(currentTab==='settings') c.innerHTML = viewSettings();
   bindTabEvents();
+  applyDynamicTableSizing();
+}
+
+/* =========================================================
+   DYNAMIC TABLE SIZING — "the table grows to match its data".
+   Every printable table (roster / berth-plan) uses the shared
+   .rt-table class, so this one engine sizes ALL of them the
+   same way: fewer rows/columns => bigger, roomier text; more
+   rows/columns => the size steps down gracefully so everything
+   still fits and stays readable. Runs after every render and
+   right before any print/share capture.
+========================================================= */
+function applyDynamicTableSizing(){
+  document.querySelectorAll('.rt-table').forEach(table=>{
+    const body = table.tBodies && table.tBodies[0];
+    const rowCount = body ? body.rows.length : 0;
+    const headRow = table.tHead && table.tHead.rows[table.tHead.rows.length-1];
+    const colCount = headRow ? headRow.cells.length : 4;
+
+    // Base sizes are generous (large table = few rows) and step
+    // down as more rows/columns are packed in, never going below
+    // a comfortably readable floor.
+    let base;
+    if(rowCount <= 3) base = 34;
+    else if(rowCount <= 6) base = 30;
+    else if(rowCount <= 10) base = 26;
+    else if(rowCount <= 16) base = 22;
+    else base = 19;
+
+    if(colCount >= 7) base -= 2;
+    base = Math.max(16, Math.min(34, base));
+
+    const cellPad = Math.max(10, Math.round(base * 0.78));
+    const headBase = Math.min(base + 4, 36);
+
+    // setProperty(...,'important') so this always wins over the page's
+    // many legacy !important CSS rules, regardless of screen size or
+    // which print/media block last touched .rt-table in the stylesheet.
+    table.style.setProperty('font-size', base+'px', 'important');
+    table.querySelectorAll('td').forEach(td=>{
+      td.style.setProperty('font-size', base+'px', 'important');
+      td.style.setProperty('padding', cellPad+'px '+(cellPad+2)+'px', 'important');
+    });
+    table.querySelectorAll('th').forEach(th=>{
+      th.style.setProperty('font-size', headBase+'px', 'important');
+      th.style.setProperty('padding', cellPad+'px '+(cellPad+2)+'px', 'important');
+    });
+    table.querySelectorAll('.rt-team, .rt-title').forEach(el=>{
+      el.style.setProperty('font-size', (headBase+6)+'px', 'important');
+      el.style.setProperty('font-weight', '900', 'important');
+    });
+  });
 }
 
 /* ===================== MODERN HOME MENU ===================== */
@@ -1091,6 +1158,7 @@ function viewPier(){
       <div class="field"><label>اسم المركب</label><input id="vName" placeholder="اسم المركب"></div>
       <div class="field"><label>وقت الوصول المتوقع (ETA)</label><input id="vEta" type="datetime-local"></div>
       <div class="field"><label>الحمولة</label><input id="vCargo" placeholder="نوع/كمية الحمولة"></div>
+      <div class="field"><label>رقم الرصيف (اختياري)</label><input id="vBerth" placeholder="مثال: رصيف 3"></div>
       <button class="btn-gold" style="width:100%" onclick="addVessel()">إضافة المركب</button>
     </div>
 
@@ -1118,6 +1186,12 @@ function viewPier(){
       <button class="btn-ghost" style="width:100%" onclick="parsePierText()">تحليل النص وإضافة المراكب</button>
     </div>
   </div>
+
+  <div class="row" style="justify-content:space-between;margin-top:22px;margin-bottom:10px;">
+    <h3 style="margin:0;">جدول بيرس بلان المدمج (للتصدير كصورة)</h3>
+    <button class="btn-gold btn-sm" onclick="sharePierTable()">📤 مشاركة صورة البيرس بلان بالكامل</button>
+  </div>
+  ${buildPierPrintBundleHTML()}
 
   <div style="margin-top:16px;">${renderVessels()}</div>
   </div>`;
@@ -1238,8 +1312,9 @@ function addVessel(){
   const name = document.getElementById('vName').value.trim();
   const eta = document.getElementById('vEta').value;
   const cargo = document.getElementById('vCargo').value.trim();
+  const berth = (document.getElementById('vBerth')?.value||'').trim();
   if(!name) return;
-  const v = {id:uid(), name, eta, cargo};
+  const v = {id:uid(), name, eta, cargo, berth};
   state.vessels.push(v);
   log('مركب','إضافة',null,v);
   saveState(); renderTab();
@@ -1254,10 +1329,13 @@ function openEditVesselModal(id){
   if(newEta === null) return;
   const newCargo = prompt('تعديل الحمولة:', v.cargo);
   if(newCargo === null) return;
+  const newBerth = prompt('تعديل رقم الرصيف (اختياري):', v.berth||'');
+  if(newBerth === null) return;
 
   v.name = newName.trim() || v.name;
   v.eta = newEta.trim();
   v.cargo = newCargo.trim();
+  v.berth = newBerth.trim();
   log('مركب', 'تعديل', null, v);
   saveState();
   renderTab();
@@ -1391,6 +1469,28 @@ function viewRoster(){
     <button class="btn-ghost" onclick="addVesselToRoster('${esc(date)}')">إضافة للتخطيط</button>
   </div>
 
+  <div class="card" style="margin-bottom:16px; border-color:rgba(107,231,255,.35);">
+    <h3 style="margin:0 0 6px;">🏗️ إضافة ونش يدوياً (بدون ربطه بمركب)</h3>
+    <div class="muted" style="margin-bottom:10px;">لو عايز تسجل ونش شغال في مهمة عامة أو أي عمل مش تابع لمركب معين، ضيفه هنا وهيظهر في جدول الوردية زي أي ونش تاني.</div>
+    <div class="g3" style="align-items:flex-end;">
+      <div class="field" style="margin-bottom:0;">
+        <label>اختر رقم الونش</label>
+        <select id="manualCraneNum-${esc(date)}">
+          <option value="">-- اختر الونش --</option>
+          ${getAvailableMasterCranes(date).map(c=>`<option value="${esc(c.number)}">ونش ${esc(c.number)}</option>`).join('')}
+        </select>
+      </div>
+      <div class="field" style="margin-bottom:0;">
+        <label>رقم العنبر (اختياري)</label>
+        <select id="manualCraneHold-${esc(date)}">
+          <option value="">-- بدون --</option>
+          ${[1,2,3,4,5,6,7,8,9].map(n=>`<option value="${n}">عنبر ${n}</option>`).join('')}
+        </select>
+      </div>
+      <button class="btn-gold btn-sm" style="height:42px;" onclick="addManualCrane('${esc(date)}')">+ إضافة الونش</button>
+    </div>
+  </div>
+
   ${renderRosterVessels(date)}
   ${renderTeamAssignments(date)}
 
@@ -1478,6 +1578,39 @@ function renderOtherTasksList(date){
       </div>
     `;
   }).join('');
+}
+
+/* ===== Manual crane entry — a crane not linked to any specific vessel.
+   Reuses the exact same "vessel with cranes" data model (so every rule
+   already in place — duplicate-check, operators, equipment, hold, and
+   the roster table row builder — keeps working with zero special-casing)
+   by filing it under one shared pseudo-vessel called "بدون مركب". ===== */
+const GENERAL_VESSEL_NAME = 'بدون مركب — أعمال عامة';
+function getOrCreateGeneralVessel(date){
+  const roster = getRoster(date);
+  let gv = roster.vessels.find(v=>v.name===GENERAL_VESSEL_NAME);
+  if(!gv){
+    gv = {id:uid(), name:GENERAL_VESSEL_NAME, cranes:[], general:true};
+    roster.vessels.push(gv);
+    saveState();
+  }
+  return gv;
+}
+function addManualCrane(date){
+  const gv = getOrCreateGeneralVessel(date);
+  const numSel = document.getElementById(`manualCraneNum-${date}`);
+  const holdSel = document.getElementById(`manualCraneHold-${date}`);
+  const craneNumber = numSel ? numSel.value.trim() : '';
+  const hold = holdSel ? holdSel.value.trim() : '';
+  if(!craneNumber){ alert('من فضلك اختر رقم الونش أولاً'); return; }
+
+  const roster = getRoster(date);
+  const duplicate = roster.vessels.some(v=>(v.cranes||[]).some(c=>String(c.craneNumber)===String(craneNumber)));
+  if(duplicate){ alert('هذا الونش تم اختياره بالفعل في تقسيمة اليوم ولا يمكن اختياره مرتين.'); renderTab(); return; }
+
+  gv.cranes.push({ id:uid(), craneNumber, hold: hold || '-', operators:[], equipment:[] });
+  log('روستر','إضافة ونش يدوي (بدون مركب)',null,{date,craneNumber});
+  saveState(); renderTab();
 }
 
 function addVesselToRoster(date){
@@ -1967,6 +2100,84 @@ function buildRosterPrintBundleHTML(date){
 
 function shareRosterTable(date){
   shareElement('rosterTableCapture', `roster_table_${esc(date)}.png`, '#ffffff');
+}
+
+/* =========================================================
+   BERTH PLAN PRINTABLE TABLE — mirrors the roster table 1:1:
+   same .rt-table class (so the dynamic font-sizing engine and
+   all its print styling apply automatically), same brand/logo
+   header, same "grows with its data" behaviour.
+========================================================= */
+function buildPierTableHTML(){
+  const ar = currentLang()==='ar';
+  if(!state.vessels.length){
+    return `<div class="empty muted">${ar?'لا توجد مراكب مضافة بعد لعرضها في بيرس بلان':'No vessels added yet to display in the berth plan'}</div>`;
+  }
+  const nameHead = ar ? 'اسم المركب' : 'Vessel';
+  const etaHead = ar ? 'وقت الوصول (ETA)' : 'ETA';
+  const cargoHead = ar ? 'الحمولة' : 'Cargo';
+  const berthHead = ar ? 'رقم الرصيف' : 'Berth';
+
+  const rows = state.vessels.map(v=>{
+    let etaLabel = '';
+    if(v.eta){
+      const d = new Date(v.eta);
+      etaLabel = isNaN(d.getTime()) ? v.eta : d.toLocaleString(ar?'ar-EG':'en-GB',{year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'});
+    }
+    return { vessel: v.name||'', eta: etaLabel, cargo: v.cargo||'', berth: v.berth||'' };
+  });
+  const hasBerth = rows.some(r=>r.berth);
+
+  const columns = [
+    {key:'eta', label:etaHead},
+    {key:'cargo', label:cargoHead},
+    ...(hasBerth ? [{key:'berth', label:berthHead}] : [])
+  ];
+
+  return `
+  <div class="roster-export-shell">
+    <table class="rt-table">
+      <thead>
+        <tr>
+          <th class="rt-team" rowspan="2">${ar?'بيرس بلان':'Berth Plan'}</th>
+          <th class="rt-title" colspan="${columns.length+1}">BERTH PLAN</th>
+        </tr>
+        <tr>
+          <th>${nameHead}</th>
+          ${columns.map(c=>`<th>${c.label}</th>`).join('')}
+        </tr>
+      </thead>
+      <tbody>
+        ${rows.map((r,i)=>`
+          <tr>
+            ${i===0 ? `<td class="rt-team" rowspan="${rows.length}">${ar?'بيرس بلان':'Berth Plan'}</td>` : ''}
+            <td>${esc(r.vessel)}</td>
+            ${columns.map(c=>`<td>${esc(r[c.key]||'')}</td>`).join('')}
+          </tr>`).join('')}
+      </tbody>
+    </table>
+  </div>`;
+}
+
+function buildPierPrintBundleHTML(){
+  const ar = currentLang()==='ar';
+  const todayLabel = new Date().toLocaleDateString(ar?'ar-EG':'en-GB',{year:'numeric',month:'long',day:'numeric'});
+  return `
+  <div id="pierTableCapture" class="print-wrap">
+    <div class="roster-print-header">
+      <div class="rph-logo"><img src="af-logic-logo.png" alt="AF LOGIC"></div>
+      <div class="rph-title">BERTH PLAN</div>
+      <div class="rph-meta" dir="${ar?'rtl':'ltr'}">
+        <div class="shift">${ar?'بيرس بلان':'Berth Plan'}</div>
+        <div class="date">${ar?'التاريخ: ':'Date: '}${esc(todayLabel)}</div>
+      </div>
+    </div>
+    ${buildPierTableHTML()}
+  </div>`;
+}
+
+function sharePierTable(){
+  shareElement('pierTableCapture', `berth_plan_${todayStr()}.png`, '#ffffff');
 }
 
 function assignOperatorText(date, vId, crId) {
@@ -2830,14 +3041,3 @@ window.onload = function(){
 </script>
 </body>
 </html>
-<style id="final-roster-sizing">
-.roster-export-shell{width:100%;overflow:visible}
-.rt-table{font-size:28px!important;min-width:1100px!important}
-.rt-table th{font-size:30px!important;padding:24px 28px!important;white-space:nowrap}
-.rt-table td{font-size:28px!important;padding:24px 28px!important;line-height:1.45!important;white-space:normal;vertical-align:middle}
-.rt-table .rt-team,.rt-table .rt-title{font-size:34px!important;font-weight:900!important}
-.roster-brand-row{min-height:150px!important;padding:18px 24px!important}
-.roster-brand-row img{width:132px!important;height:132px!important}
-.roster-brand-copy strong{font-size:1.2rem!important;font-weight:900!important}
-.roster-brand-copy span{font-size:.82rem!important;font-weight:900!important;letter-spacing:2.6px!important;text-transform:uppercase!important}
-</style>
