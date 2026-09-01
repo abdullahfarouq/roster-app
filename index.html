@@ -185,6 +185,15 @@ th{color:var(--gold);font-weight:700;}
 
 /* Handover Excel Style Print Table */
 .vessel-handover-block{margin-bottom:18px;}
+.handover-crane-row{border:1px solid var(--border);border-radius:14px;padding:14px;margin-bottom:12px;background:rgba(255,255,255,0.03);}
+.chip-picker{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px;}
+.chip-toggle{padding:6px 13px;border-radius:100px;border:1px solid var(--border);font-size:.85rem;cursor:pointer;user-select:none;transition:all .15s ease;background:rgba(255,255,255,0.04);}
+.chip-toggle:hover{border-color:var(--gold);}
+.chip-toggle.active{background:var(--gold);color:#111;font-weight:700;border-color:var(--gold);}
+.holdplan-controls{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:12px;margin-top:14px;}
+.holdplan-hold-card{border:1px solid var(--border);border-radius:14px;padding:12px;background:rgba(255,255,255,0.03);}
+.holdplan-hold-card.done{border-color:#2fae63;background:rgba(47,174,99,0.1);}
+.holdplan-hold-card b{display:block;margin-bottom:6px;color:var(--gold);}
 .excel-handover-table{width:100%;border-collapse:collapse;background:#fff;color:#000;font-family:var(--font-ar);font-size:1.05rem;direction:rtl;text-align:center;}
 .excel-handover-table th,.excel-handover-table td{border:1.5px solid #000;padding:10px 8px;font-weight:bold;}
 .excel-handover-table th{background:#e2e2e2;color:#000;font-size:1rem;}
@@ -664,6 +673,7 @@ function blankState(loginId,name,phone,email){
     leaves:[],
     handovers:[],
     handoverVessels:[],
+    holdPlans:[],
     yard:{ name:'', notes:'' },
     rosterDates:{},
     logs:[],
@@ -701,6 +711,7 @@ function tryLogin(){
       if(email) state.email = email;
       if(!state.crew.cranes) state.crew.cranes = [];
       if(!state.handoverVessels) state.handoverVessels = [];
+      if(!state.holdPlans) state.holdPlans = [];
       if(!state.yard) state.yard = {name:'', notes:''};
       if(!state.lang) state.lang = localStorage.getItem('roster_lang') || 'en';
     } else {
@@ -727,6 +738,7 @@ function checkAutoLogin(){
         if(savedName) state.name = savedName;
         if(!state.crew.cranes) state.crew.cranes = [];
         if(!state.handoverVessels) state.handoverVessels = [];
+        if(!state.holdPlans) state.holdPlans = [];
         if(!state.yard) state.yard = {name:'', notes:''};
         if(!state.lang) state.lang = localStorage.getItem('roster_lang') || 'en';
         document.documentElement.setAttribute('lang', state.lang);
@@ -769,6 +781,7 @@ const TABS = [
   {id:'calendar', label:'جدول المناوبات', icon:'🗓️'},
   {id:'leaves', label:'الإجازات', icon:'🌴'},
   {id:'handover', label:'التسليم والتسلم', icon:'🔄'},
+  {id:'holdplan', label:'مخطط العنابر', icon:'🚢'},
   {id:'settings', label:'الإعدادات', icon:'⚙️'},
 ];
 
@@ -804,6 +817,7 @@ function renderTab(){
   else if(currentTab==='calendar') c.innerHTML = viewCalendar();
   else if(currentTab==='leaves') c.innerHTML = viewLeaves();
   else if(currentTab==='handover') c.innerHTML = viewHandover();
+  else if(currentTab==='holdplan') c.innerHTML = viewHoldPlan();
   else if(currentTab==='settings') c.innerHTML = viewSettings();
   bindTabEvents();
   applyDynamicTableSizing();
@@ -2642,11 +2656,34 @@ function addHandoverCraneRow(vId){
   const v = state.handoverVessels.find(x=>x.id===vId);
   v.cranes.push({
     id: uid(),
-    craneNumber: '',
+    craneNumbers: [],
     hold: '',
     loaderName: '',
-    radioChannel: ''
+    radioChannel: '',
+    operatorNames: []
   });
+  saveState(); renderTab();
+}
+
+function toggleHandoverCraneNumber(vId, crId, number){
+  const v = state.handoverVessels.find(x=>x.id===vId);
+  if(!v) return;
+  const cr = v.cranes.find(c=>c.id===crId);
+  if(!cr) return;
+  if(!cr.craneNumbers) cr.craneNumbers = cr.craneNumber ? [cr.craneNumber] : [];
+  const i = cr.craneNumbers.indexOf(number);
+  if(i>-1) cr.craneNumbers.splice(i,1); else cr.craneNumbers.push(number);
+  saveState(); renderTab();
+}
+
+function toggleHandoverOperator(vId, crId, name){
+  const v = state.handoverVessels.find(x=>x.id===vId);
+  if(!v) return;
+  const cr = v.cranes.find(c=>c.id===crId);
+  if(!cr) return;
+  if(!cr.operatorNames) cr.operatorNames = [];
+  const i = cr.operatorNames.indexOf(name);
+  if(i>-1) cr.operatorNames.splice(i,1); else cr.operatorNames.push(name);
   saveState(); renderTab();
 }
 
@@ -2672,62 +2709,63 @@ function renderHandoverVessels(){
   if(!state.handoverVessels.length) return `<div class="empty muted">لم تتم إضافة أي مركب لقائمة التسليم بعد</div>`;
   const cranesList = state.crew.cranes || [];
   const loadersList = state.crew.loaders || [];
+  const operatorsList = state.crew.operators || [];
 
   return state.handoverVessels.map(v=>`
     <div class="card" style="margin-bottom:16px;">
       <div class="row" style="justify-content:space-between; margin-bottom:12px;">
         <h2>🚢 مركب: <span style="color:var(--gold);">${esc(v.name)}</span></h2>
         <div class="row">
-          <button class="btn-ghost btn-sm" onclick="addHandoverCraneRow('${esc(v.id)}')">+ إضافة ونش لجدول المركب</button>
+          <button class="btn-ghost btn-sm" onclick="addHandoverCraneRow('${esc(v.id)}')">+ إضافة صف / فريق ونش</button>
           <button class="btn-danger btn-sm" onclick="removeHandoverVesselEntry('${esc(v.id)}')">حذف المركب</button>
         </div>
       </div>
 
-      ${v.cranes.length ? `
-        <div style="overflow-x:auto;">
-          <table>
-            <thead>
-              <tr>
-                <th>الونش</th>
-                <th>العنبر (من 1 إلى 9)</th>
-                <th>اللودر</th>
-                <th>قناة الراديو</th>
-                <th style="width:50px;"></th>
-              </tr>
-            </thead>
-            <tbody>
-              ${v.cranes.map(cr=>`
-                <tr>
-                  <td>
-                    <select onchange="updateHandoverCraneRowField('${esc(v.id)}','${esc(cr.id)}','craneNumber',this.value)">
-                      <option value="">-- اختر الونش --</option>
-                      ${cranesList.map(c=>`<option value="${esc(c.number)}" ${cr.craneNumber===c.number?'selected':''}>ونش ${esc(c.number)}</option>`).join('')}
-                    </select>
-                  </td>
-                  <td>
-                    <select onchange="updateHandoverCraneRowField('${esc(v.id)}','${esc(cr.id)}','hold',this.value)">
-                      <option value="">-- اختر --</option>
-                      ${[1,2,3,4,5,6,7,8,9].map(n=>`<option value="${n}" ${cr.hold==n?'selected':''}>عنبر ${n}</option>`).join('')}
-                    </select>
-                  </td>
-                  <td>
-                    <select onchange="updateHandoverCraneRowField('${esc(v.id)}','${esc(cr.id)}','loaderName',this.value)">
-                      <option value="">-- اختر اللودر --</option>
-                      ${loadersList.map(l=>`<option value="لودر ${esc(l.number)}" ${cr.loaderName==='لودر '+l.number || cr.loaderName===l.number?'selected':''}>لودر ${esc(l.number)}</option>`).join('')}
-                    </select>
-                  </td>
-                  <td>
-                    <input value="${esc(cr.radioChannel||'')}" placeholder="مثال: CH 68" oninput="updateHandoverCraneRowField('${esc(v.id)}','${esc(cr.id)}','radioChannel',this.value)">
-                  </td>
-                  <td>
-                    <button class="btn-danger btn-sm" onclick="removeHandoverCraneRow('${esc(v.id)}','${esc(cr.id)}')">✕</button>
-                  </td>
-                </tr>
-              `).join('')}
-            </tbody>
-          </table>
+      ${v.cranes.length ? v.cranes.map(cr=>{
+        const craneNumbers = cr.craneNumbers || (cr.craneNumber ? [cr.craneNumber] : []);
+        const operatorNames = cr.operatorNames || [];
+        return `
+        <div class="handover-crane-row">
+          <div class="row" style="justify-content:space-between;align-items:flex-start;">
+            <div style="flex:1;">
+              <div class="field">
+                <label>الأوناش (اختر واحد أو أكثر ليعملوا كفريق واحد في نفس الصف)</label>
+                <div class="chip-picker">
+                  ${cranesList.length ? cranesList.map(c=>`
+                    <span class="chip-toggle ${craneNumbers.includes(c.number)?'active':''}" onclick="toggleHandoverCraneNumber('${esc(v.id)}','${esc(cr.id)}','${esc(c.number)}')">ونش ${esc(c.number)}</span>
+                  `).join('') : '<span class="muted">لا توجد أوناش مسجلة — أضفها من تبويب التشغيل والمعدات</span>'}
+                </div>
+              </div>
+              <div class="field">
+                <label>الونّاشين المسؤولين عن هذا الصف</label>
+                <div class="chip-picker">
+                  ${operatorsList.length ? operatorsList.map(o=>`
+                    <span class="chip-toggle ${operatorNames.includes(o.name)?'active':''}" onclick="toggleHandoverOperator('${esc(v.id)}','${esc(cr.id)}','${esc(o.name)}')">${esc(o.name)}</span>
+                  `).join('') : '<span class="muted">لا يوجد ونّاشين مسجلين بعد</span>'}
+                </div>
+              </div>
+              <div class="g2" style="margin-top:8px;">
+                <div class="field"><label>العنبر (من 1 إلى 9)</label>
+                  <select onchange="updateHandoverCraneRowField('${esc(v.id)}','${esc(cr.id)}','hold',this.value)">
+                    <option value="">-- اختر --</option>
+                    ${[1,2,3,4,5,6,7,8,9].map(n=>`<option value="${n}" ${cr.hold==n?'selected':''}>عنبر ${n}</option>`).join('')}
+                  </select>
+                </div>
+                <div class="field"><label>اللودر</label>
+                  <select onchange="updateHandoverCraneRowField('${esc(v.id)}','${esc(cr.id)}','loaderName',this.value)">
+                    <option value="">-- اختر اللودر --</option>
+                    ${loadersList.map(l=>`<option value="لودر ${esc(l.number)}" ${cr.loaderName==='لودر '+l.number || cr.loaderName===l.number?'selected':''}>لودر ${esc(l.number)}</option>`).join('')}
+                  </select>
+                </div>
+                <div class="field"><label>قناة الراديو</label>
+                  <input value="${esc(cr.radioChannel||'')}" placeholder="مثال: CH 68" oninput="updateHandoverCraneRowField('${esc(v.id)}','${esc(cr.id)}','radioChannel',this.value)">
+                </div>
+              </div>
+            </div>
+            <button class="btn-danger btn-sm" onclick="removeHandoverCraneRow('${esc(v.id)}','${esc(cr.id)}')">✕</button>
+          </div>
         </div>
-      ` : `<div class="muted">اضغط على (+ إضافة ونش لجدول المركب) لبدء إدخال البيانات</div>`}
+      `;}).join('') : `<div class="muted">اضغط على (+ إضافة صف / فريق ونش) لبدء إدخال البيانات</div>`}
     </div>
   `).join('');
 }
@@ -2752,20 +2790,25 @@ function buildHandoverTableHTML(){
             <th>الونش</th>
             <th>العنبر</th>
             <th>اللودر</th>
+            <th>الونّاشين</th>
             <th>قناة الراديو</th>
           </tr>
         </thead>
         <tbody>
-          ${v.cranes.length ? v.cranes.map(cr => `
+          ${v.cranes.length ? v.cranes.map(cr => {
+            const craneNumbers = cr.craneNumbers || (cr.craneNumber ? [cr.craneNumber] : []);
+            const operatorNames = cr.operatorNames || [];
+            return `
             <tr>
-              <td style="font-size:1.1rem; color:#000;">${esc(cr.craneNumber || '-')}</td>
+              <td style="font-size:1.1rem; color:#000;">${esc(craneNumbers.length ? craneNumbers.join(' + ') : '-')}</td>
               <td>${esc(cr.hold || '-')}</td>
               <td>${esc(cr.loaderName || '-')}</td>
+              <td>${esc(operatorNames.length ? operatorNames.join(' - ') : '-')}</td>
               <td>${esc(cr.radioChannel || '-')}</td>
             </tr>
-          `).join('') : `
+          `;}).join('') : `
             <tr>
-              <td colspan="4" style="color:#777; font-weight:normal;">لا توجد بيانات أوناش مضافة بعد لهذا المركب</td>
+              <td colspan="5" style="color:#777; font-weight:normal;">لا توجد بيانات أوناش مضافة بعد لهذا المركب</td>
             </tr>
           `}
         </tbody>
@@ -2773,6 +2816,240 @@ function buildHandoverTableHTML(){
     </div>
     `;
   }).join('');
+}
+
+/* ===================== HOLD PLAN (vessel hold / crane / loader diagram) ===================== */
+function viewHoldPlan(){
+  if(!state.holdPlans) state.holdPlans = [];
+  return `
+  <div id="captureArea">
+  <h1>مخطط العنابر</h1>
+  <div class="card" style="margin-bottom:16px;">
+    <h3>🚢 إضافة مخطط مركب جديد</h3>
+    <p class="muted" style="margin-bottom:10px;">اكتب اسم المركب أو اختره، وحدد عدد العنابر (من 2 إلى 9) — البرنامج هيرسم شكل المركب تلقائياً بعدد العنابر ده.</p>
+    <div class="g2">
+      <div class="field"><label>اختر مركب من بيرس بلان</label>
+        <select id="hpPickVessel">
+          <option value="">-- اختر مركب --</option>
+          ${state.vessels.map(v=>`<option value="${esc(v.id)}">${esc(v.name)}</option>`).join('')}
+        </select>
+      </div>
+      <div class="field"><label>أو اكتب اسم مركب يدوياً</label><input id="hpManualVessel" placeholder="اسم مركب جديد"></div>
+    </div>
+    <div class="field"><label>عدد العنابر</label>
+      <select id="hpHoldsCount">
+        ${[2,3,4,5,6,7,8,9].map(n=>`<option value="${n}" ${n===9?'selected':''}>${n} عنابر</option>`).join('')}
+      </select>
+    </div>
+    <button class="btn-gold" onclick="addHoldPlanEntry()">إضافة وتوليد مخطط المركب</button>
+  </div>
+
+  ${renderHoldPlanEntries()}
+  </div>`;
+}
+
+function addHoldPlanEntry(){
+  const pick = document.getElementById('hpPickVessel').value;
+  const manual = document.getElementById('hpManualVessel').value.trim();
+  const holdsCount = Number(document.getElementById('hpHoldsCount').value)||9;
+  let name;
+  if(pick){ name = state.vessels.find(v=>v.id===pick).name; }
+  else if(manual){ name = manual; }
+  else { alert('اختر مركب أو اكتب اسمه'); return; }
+  const holds = Array.from({length:holdsCount}, (_,i)=>({index:i+1, craneNumber:'', loaderNumber:'', qty:'', done:false}));
+  state.holdPlans.push({id:uid(), name, holdsCount, date:todayStr(), holds});
+  log('مخطط عنابر','إضافة مركب',null,{name,holdsCount});
+  saveState(); renderTab();
+}
+
+function removeHoldPlanEntry(id){
+  const p = state.holdPlans.find(x=>x.id===id);
+  if(!confirm('إزالة مخطط هذا المركب؟')) return;
+  state.holdPlans = state.holdPlans.filter(x=>x.id!==id);
+  log('مخطط عنابر','حذف مركب',p,null);
+  saveState(); renderTab();
+}
+
+function updateHoldPlanCount(planId, newCount){
+  const p = state.holdPlans.find(x=>x.id===planId);
+  if(!p) return;
+  newCount = Number(newCount)||p.holdsCount;
+  const oldHolds = p.holds || [];
+  const newHolds = [];
+  for(let i=1;i<=newCount;i++){
+    const existing = oldHolds.find(h=>h.index===i);
+    newHolds.push(existing || {index:i, craneNumber:'', loaderNumber:'', qty:'', done:false});
+  }
+  p.holds = newHolds;
+  p.holdsCount = newCount;
+  saveState(); renderTab();
+}
+
+function updateHoldField(planId, holdIndex, field, value){
+  const p = state.holdPlans.find(x=>x.id===planId);
+  if(!p) return;
+  const h = p.holds.find(x=>x.index===holdIndex);
+  if(!h) return;
+  h[field] = value;
+  saveState();
+  const svgBox = document.getElementById(`holdPlanSvg-${planId}`);
+  if(svgBox) svgBox.innerHTML = buildVesselSVG(p);
+}
+
+function toggleHoldDone(planId, holdIndex){
+  const p = state.holdPlans.find(x=>x.id===planId);
+  if(!p) return;
+  const h = p.holds.find(x=>x.index===holdIndex);
+  if(!h) return;
+  h.done = !h.done;
+  saveState(); renderTab();
+}
+
+function renderHoldPlanEntries(){
+  if(!state.holdPlans.length) return `<div class="empty muted">لم تتم إضافة أي مخطط مركب بعد</div>`;
+  const cranesList = state.crew.cranes || [];
+  const loadersList = state.crew.loaders || [];
+
+  return state.holdPlans.map(p=>`
+    <div class="card" style="margin-bottom:20px;">
+      <div class="row" style="justify-content:space-between; margin-bottom:12px;">
+        <h2>🚢 مركب: <span style="color:var(--gold);">${esc(p.name)}</span></h2>
+        <div class="row">
+          <button class="btn-ghost btn-sm" onclick="shareElement('holdPlanCapture-${p.id}','hold_plan_${esc(p.name)}_${todayStr()}.png','#ffffff')">📤 مشاركة الصورة</button>
+          <button class="btn-danger btn-sm" onclick="removeHoldPlanEntry('${esc(p.id)}')">حذف</button>
+        </div>
+      </div>
+
+      <div class="field" style="max-width:220px;">
+        <label>عدد العنابر</label>
+        <select onchange="updateHoldPlanCount('${esc(p.id)}',this.value)">
+          ${[2,3,4,5,6,7,8,9].map(n=>`<option value="${n}" ${n===p.holdsCount?'selected':''}>${n} عنابر</option>`).join('')}
+        </select>
+      </div>
+
+      <div class="holdplan-controls">
+        ${p.holds.map(h=>`
+          <div class="holdplan-hold-card ${h.done?'done':''}">
+            <b>عنبر ${h.index}</b>
+            <div class="field"><label>الونش</label>
+              <select onchange="updateHoldField('${esc(p.id)}',${h.index},'craneNumber',this.value)">
+                <option value="">-- بدون --</option>
+                ${cranesList.map(c=>`<option value="${esc(c.number)}" ${h.craneNumber===c.number?'selected':''}>ونش ${esc(c.number)}</option>`).join('')}
+              </select>
+            </div>
+            <div class="field"><label>اللودر</label>
+              <select onchange="updateHoldField('${esc(p.id)}',${h.index},'loaderNumber',this.value)">
+                <option value="">-- بدون --</option>
+                ${loadersList.map(l=>`<option value="${esc(l.number)}" ${h.loaderNumber===l.number?'selected':''}>لودر ${esc(l.number)}</option>`).join('')}
+              </select>
+            </div>
+            <div class="field"><label>كمية البضاعة المتبقية</label>
+              <input value="${esc(h.qty||'')}" placeholder="مثال: 1200 طن" oninput="updateHoldField('${esc(p.id)}',${h.index},'qty',this.value)">
+            </div>
+            <label class="row" style="gap:8px;cursor:pointer;margin-top:6px;">
+              <input type="checkbox" ${h.done?'checked':''} onchange="toggleHoldDone('${esc(p.id)}',${h.index})">
+              <span>تم الانتهاء من العمل على هذا العنبر</span>
+            </label>
+          </div>
+        `).join('')}
+      </div>
+
+      <div id="holdPlanCapture-${p.id}" class="print-wrap" style="margin-top:16px;overflow-x:auto;">
+        <div id="holdPlanSvg-${p.id}">${buildVesselSVG(p)}</div>
+      </div>
+    </div>
+  `).join('');
+}
+
+/* Builds a schematic side-view of the vessel with N holds, numbered 1 (bow, right)
+   through N (stern, left). Each hold optionally shows: a crane icon + number above it,
+   a loader icon + number inside it, a remaining-quantity label, and a "done" fill color.
+   Holds with nothing entered stay empty — no placeholder data is ever drawn. */
+function buildVesselSVG(plan){
+  const N = plan.holdsCount;
+  const holdW = 130;
+  const superW = 150;
+  const bowLen = 90;
+  const topY = 110, bottomY = 300, midY = (topY+bottomY)/2;
+  const hullX0 = superW;
+  const hullX1 = hullX0 + N*holdW;
+  const bowTipX = hullX1 + bowLen;
+  const totalW = bowTipX + 40;
+  const totalH = 400;
+
+  const hullPath = `
+    M ${hullX0},${topY}
+    L ${hullX1},${topY}
+    L ${bowTipX},${midY}
+    L ${hullX1},${bottomY}
+    L ${hullX0},${bottomY}
+    Q ${hullX0-38},${bottomY} ${hullX0-38},${bottomY-40}
+    L ${hullX0-38},${topY+30}
+    Q ${hullX0-38},${topY} ${hullX0},${topY}
+    Z`;
+
+  const dividers = [];
+  for(let i=1;i<N;i++){
+    const x = hullX0 + i*holdW;
+    dividers.push(`<line x1="${x}" y1="${topY}" x2="${x}" y2="${bottomY}" stroke="#333" stroke-width="1.5"/>`);
+  }
+
+  const holds = plan.holds.map(h=>{
+    // Hold 1 is at the bow (rightmost), hold N is nearest the superstructure (leftmost).
+    const cellX0 = hullX0 + (N - h.index) * holdW;
+    const cellX1 = cellX0 + holdW;
+    const cellCx = (cellX0+cellX1)/2;
+    const fill = h.done ? '#bdeecb' : '#ffffff';
+
+    let craneIcon = '';
+    if(h.craneNumber){
+      const mastX = cellCx;
+      craneIcon = `
+        <g>
+          <line x1="${mastX}" y1="${topY}" x2="${mastX}" y2="${topY-42}" stroke="#374151" stroke-width="3"/>
+          <line x1="${mastX}" y1="${topY-42}" x2="${mastX-34}" y2="${topY-4}" stroke="#374151" stroke-width="3"/>
+          <line x1="${mastX}" y1="${topY-42}" x2="${mastX+34}" y2="${topY-4}" stroke="#374151" stroke-width="3"/>
+          <circle cx="${mastX}" cy="${topY-58}" r="17" fill="#0a84ff"/>
+          <text x="${mastX}" y="${topY-53}" text-anchor="middle" font-size="15" font-weight="800" fill="#fff">${esc(h.craneNumber)}</text>
+        </g>`;
+    }
+
+    let loaderIcon = '';
+    if(h.loaderNumber){
+      const lx = cellCx - 26, ly = bottomY - 44;
+      loaderIcon = `
+        <g>
+          <rect x="${lx}" y="${ly}" width="52" height="26" rx="4" fill="#f5c542" stroke="#333" stroke-width="1.5"/>
+          <rect x="${lx+34}" y="${ly-14}" width="16" height="16" rx="2" fill="#f5c542" stroke="#333" stroke-width="1.5"/>
+          <circle cx="${lx+10}" cy="${ly+28}" r="7" fill="#222"/>
+          <circle cx="${lx+42}" cy="${ly+28}" r="7" fill="#222"/>
+          <text x="${cellCx}" y="${ly+15}" text-anchor="middle" font-size="12" font-weight="800" fill="#111">${esc(h.loaderNumber)}</text>
+        </g>`;
+    }
+
+    const qtyText = h.qty ? `<text x="${cellCx}" y="${bottomY-8}" text-anchor="middle" font-size="12" fill="#111">${esc(h.qty)}</text>` : '';
+    const doneMark = h.done ? `<text x="${cellX1-10}" y="${topY+20}" text-anchor="end" font-size="16" fill="#1a7f3c">✔</text>` : '';
+
+    return `
+      <rect x="${cellX0}" y="${topY}" width="${holdW}" height="${bottomY-topY}" fill="${fill}"/>
+      <text x="${cellCx}" y="${topY+22}" text-anchor="middle" font-size="13" font-weight="700" fill="#333">HOLD ${h.index}</text>
+      ${craneIcon}
+      ${loaderIcon}
+      ${qtyText}
+      ${doneMark}
+    `;
+  }).join('');
+
+  return `
+  <svg viewBox="0 0 ${totalW} ${totalH}" width="100%" style="max-width:${totalW}px;background:#fff;" xmlns="http://www.w3.org/2000/svg">
+    <text x="${totalW/2}" y="30" text-anchor="middle" font-size="18" font-weight="800" fill="#111">${esc(plan.name)} — ${esc(plan.date||todayStr())}</text>
+    <clipPath id="hullClip-${plan.id}"><path d="${hullPath}"/></clipPath>
+    <g clip-path="url(#hullClip-${plan.id})">${holds}</g>
+    <path d="${hullPath}" fill="none" stroke="#111" stroke-width="2.5"/>
+    ${dividers.join('')}
+    <rect x="${hullX0-20}" y="${topY-70}" width="80" height="70" fill="#e5e7eb" stroke="#111" stroke-width="2"/>
+    <line x1="${hullX0+18}" y1="${topY-70}" x2="${hullX0+18}" y2="${topY-100}" stroke="#111" stroke-width="3"/>
+  </svg>`;
 }
 
 function buildYardPrintHTML(){
