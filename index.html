@@ -1872,7 +1872,8 @@ function buildRosterTableHTML(date){
     });
   });
 
-  // A team is ONE roster row. Its member vessels/crane numbers are never printed.
+  // A team is ONE roster row. Its member vessel names and crane numbers ARE
+  // shown together in the same row (crane numbers joined with " + ").
   teams.forEach(team=>{
     const refs = (team.craneRefs||[]).map(ref=>{
       const [vId,crId] = String(ref).split('|');
@@ -1899,13 +1900,14 @@ function buildRosterTableHTML(date){
 
     const row = {
       kind:'team',
-      // IMPORTANT: do not expose any member vessel name or crane number.
-      vessel:'',
+      teamId: team.id,
+      vessel: [...new Set(refs.map(x=>x.v.name).filter(Boolean))].join(' / '),
       teamName: team.name || (currentLang()==='ar'?'فريق الوردية':'Shift Team'),
       loader:[...new Set(loaders)].join(' / '),
       fork:[...new Set(forks)].join(' / '),
       hold:[...new Set(holds)].join(' / '),
-      ops:ops.join(' - ')
+      ops:ops.join(' - '),
+      crane:[...new Set(refs.map(x=>x.c.craneNumber).filter(Boolean))].join(' + ')
     };
     rows.push(row);
     hasLoader ||= !!row.loader;
@@ -1926,24 +1928,6 @@ function buildRosterTableHTML(date){
   const forkHead = 'Forklift';
   const holdHead = ar ? 'العنبر' : 'Hold';
   const opHead = ar ? 'الونّاشين' : 'Crane Operators';
-
-  // Only create columns that actually contain data anywhere in the table.
-  // A team row deliberately has NO vessel column value because its member vessels are hidden.
-  // TEAM: one row only. Keep the member crane numbers together in the team row.
-  // INDIVIDUAL: keep the vessel, crane number, operators and any entered equipment.
-  teams.forEach(team=>{
-    const refs=(team.craneRefs||[]).map(ref=>{
-      const [vId,crId]=String(ref).split('|');
-      const v=roster.vessels.find(x=>x.id===vId);
-      const c=v&&(v.cranes||[]).find(x=>x.id===crId);
-      return v&&c?{v,c}:null;
-    }).filter(Boolean);
-    const row=rows.find(r=>r.kind==='team' && r.teamName===(team.name || (ar?'فريق الوردية':'Shift Team')));
-    if(row){
-      row.vessel=[...new Set(refs.map(x=>x.v.name).filter(Boolean))].join(' / ');
-      row.crane=[...new Set(refs.map(x=>x.c.craneNumber).filter(Boolean))].join(' + ');
-    }
-  });
 
   const craneHead = ar ? 'الونش' : 'Crane';
 
@@ -2965,17 +2949,50 @@ function renderHoldPlanEntries(){
    through N (stern, left). Each hold optionally shows: a crane icon + number above it,
    a loader icon + number inside it, a remaining-quantity label, and a "done" fill color.
    Holds with nothing entered stay empty — no placeholder data is ever drawn. */
+function craneIconSVG(cx, baseY, number){
+  const peakY = baseY - 122;
+  const badgeY = baseY - 34;
+  const bucketY = baseY - 92;
+  return `
+  <g>
+    <rect x="${cx-20}" y="${baseY-14}" width="40" height="14" rx="2" fill="#3a4048" stroke="#111" stroke-width="1"/>
+    <line x1="${cx-18}" y1="${baseY-14}" x2="${cx}" y2="${peakY}" stroke="#374151" stroke-width="4" stroke-linecap="round"/>
+    <line x1="${cx+18}" y1="${baseY-14}" x2="${cx}" y2="${peakY}" stroke="#374151" stroke-width="4" stroke-linecap="round"/>
+    <line x1="${cx}" y1="${baseY-14}" x2="${cx}" y2="${peakY}" stroke="#9ca3af" stroke-width="1.6"/>
+    <circle cx="${cx}" cy="${peakY}" r="4.5" fill="#111"/>
+    <line x1="${cx-4}" y1="${peakY+3}" x2="${cx-11}" y2="${bucketY-8}" stroke="#111" stroke-width="1.2"/>
+    <line x1="${cx+4}" y1="${peakY+3}" x2="${cx+11}" y2="${bucketY-8}" stroke="#111" stroke-width="1.2"/>
+    <path d="M ${cx-13},${bucketY-8} Q ${cx},${bucketY+7} ${cx+13},${bucketY-8} Q ${cx},${bucketY-18} ${cx-13},${bucketY-8} Z" fill="#4b5563" stroke="#111" stroke-width="1.1"/>
+    <circle cx="${cx}" cy="${badgeY}" r="15" fill="#0a84ff" stroke="#fff" stroke-width="2"/>
+    <text x="${cx}" y="${badgeY+5}" text-anchor="middle" font-size="13" font-weight="800" fill="#fff">${esc(number)}</text>
+  </g>`;
+}
+
+function loaderIconSVG(cx, cy, number){
+  return `
+  <g>
+    <rect x="${cx-13}" y="${cy-32}" width="17" height="15" rx="2" fill="#f5c542" stroke="#111" stroke-width="1.2"/>
+    <rect x="${cx-15}" y="${cy-8}" width="46" height="19" rx="4" fill="#f5c542" stroke="#111" stroke-width="1.4"/>
+    <line x1="${cx+31}" y1="${cy-2}" x2="${cx+48}" y2="${cy-18}" stroke="#333" stroke-width="3" stroke-linecap="round"/>
+    <path d="M ${cx+44},${cy-20} Q ${cx+58},${cy-22} ${cx+56},${cy-10} Q ${cx+50},${cy-8} ${cx+44},${cy-14} Z" fill="#4b5563" stroke="#111" stroke-width="1.1"/>
+    <circle cx="${cx-6}" cy="${cy+13}" r="7.5" fill="#222" stroke="#666" stroke-width="1"/>
+    <circle cx="${cx+18}" cy="${cy+13}" r="7.5" fill="#222" stroke="#666" stroke-width="1"/>
+    <circle cx="${cx+6}" cy="${cy+34}" r="13" fill="#f5c542" stroke="#111" stroke-width="1.4"/>
+    <text x="${cx+6}" y="${cy+39}" text-anchor="middle" font-size="12" font-weight="800" fill="#111">${esc(number)}</text>
+  </g>`;
+}
+
 function buildVesselSVG(plan){
   const N = plan.holdsCount;
   const holdW = 130;
   const superW = 150;
   const bowLen = 90;
-  const topY = 110, bottomY = 300, midY = (topY+bottomY)/2;
+  const topY = 190, bottomY = 400, midY = (topY+bottomY)/2;
   const hullX0 = superW;
   const hullX1 = hullX0 + N*holdW;
   const bowTipX = hullX1 + bowLen;
   const totalW = bowTipX + 40;
-  const totalH = 400;
+  const totalH = 460;
 
   const hullPath = `
     M ${hullX0},${topY}
@@ -2994,61 +3011,45 @@ function buildVesselSVG(plan){
     dividers.push(`<line x1="${x}" y1="${topY}" x2="${x}" y2="${bottomY}" stroke="#333" stroke-width="1.5"/>`);
   }
 
-  const holds = plan.holds.map(h=>{
+  const holdBodies = [];
+  const craneLayer = [];
+
+  plan.holds.forEach(h=>{
     // Hold 1 is at the bow (rightmost), hold N is nearest the superstructure (leftmost).
     const cellX0 = hullX0 + (N - h.index) * holdW;
     const cellX1 = cellX0 + holdW;
     const cellCx = (cellX0+cellX1)/2;
     const fill = h.done ? '#bdeecb' : '#ffffff';
 
-    let craneIcon = '';
-    if(h.craneNumber){
-      const mastX = cellCx;
-      craneIcon = `
-        <g>
-          <line x1="${mastX}" y1="${topY}" x2="${mastX}" y2="${topY-42}" stroke="#374151" stroke-width="3"/>
-          <line x1="${mastX}" y1="${topY-42}" x2="${mastX-34}" y2="${topY-4}" stroke="#374151" stroke-width="3"/>
-          <line x1="${mastX}" y1="${topY-42}" x2="${mastX+34}" y2="${topY-4}" stroke="#374151" stroke-width="3"/>
-          <circle cx="${mastX}" cy="${topY-58}" r="17" fill="#0a84ff"/>
-          <text x="${mastX}" y="${topY-53}" text-anchor="middle" font-size="15" font-weight="800" fill="#fff">${esc(h.craneNumber)}</text>
-        </g>`;
-    }
+    const loaderIcon = h.loaderNumber ? loaderIconSVG(cellCx-16, topY+95, h.loaderNumber) : '';
+    const qtyText = h.qty ? `<text x="${cellCx}" y="${bottomY-16}" text-anchor="middle" font-size="13" font-weight="600" fill="#111">${esc(h.qty)}</text>` : '';
+    const doneMark = h.done ? `<text x="${cellX1-12}" y="${topY+24}" text-anchor="end" font-size="17" fill="#1a7f3c">✔</text>` : '';
 
-    let loaderIcon = '';
-    if(h.loaderNumber){
-      const lx = cellCx - 26, ly = bottomY - 44;
-      loaderIcon = `
-        <g>
-          <rect x="${lx}" y="${ly}" width="52" height="26" rx="4" fill="#f5c542" stroke="#333" stroke-width="1.5"/>
-          <rect x="${lx+34}" y="${ly-14}" width="16" height="16" rx="2" fill="#f5c542" stroke="#333" stroke-width="1.5"/>
-          <circle cx="${lx+10}" cy="${ly+28}" r="7" fill="#222"/>
-          <circle cx="${lx+42}" cy="${ly+28}" r="7" fill="#222"/>
-          <text x="${cellCx}" y="${ly+15}" text-anchor="middle" font-size="12" font-weight="800" fill="#111">${esc(h.loaderNumber)}</text>
-        </g>`;
-    }
-
-    const qtyText = h.qty ? `<text x="${cellCx}" y="${bottomY-8}" text-anchor="middle" font-size="12" fill="#111">${esc(h.qty)}</text>` : '';
-    const doneMark = h.done ? `<text x="${cellX1-10}" y="${topY+20}" text-anchor="end" font-size="16" fill="#1a7f3c">✔</text>` : '';
-
-    return `
+    holdBodies.push(`
       <rect x="${cellX0}" y="${topY}" width="${holdW}" height="${bottomY-topY}" fill="${fill}"/>
       <text x="${cellCx}" y="${topY+22}" text-anchor="middle" font-size="13" font-weight="700" fill="#333">HOLD ${h.index}</text>
-      ${craneIcon}
       ${loaderIcon}
       ${qtyText}
       ${doneMark}
-    `;
-  }).join('');
+    `);
+
+    // Cranes stand ABOVE the deck line, so they must be drawn outside the
+    // hull's clip-path — otherwise they get cut off at the top edge.
+    if(h.craneNumber){
+      craneLayer.push(craneIconSVG(cellCx, topY, h.craneNumber));
+    }
+  });
 
   return `
   <svg viewBox="0 0 ${totalW} ${totalH}" width="100%" style="max-width:${totalW}px;background:#fff;" xmlns="http://www.w3.org/2000/svg">
-    <text x="${totalW/2}" y="30" text-anchor="middle" font-size="18" font-weight="800" fill="#111">${esc(plan.name)} — ${esc(plan.date||todayStr())}</text>
+    <text x="${totalW/2}" y="26" text-anchor="middle" font-size="18" font-weight="800" fill="#111">${esc(plan.name)} — ${esc(plan.date||todayStr())}</text>
     <clipPath id="hullClip-${plan.id}"><path d="${hullPath}"/></clipPath>
-    <g clip-path="url(#hullClip-${plan.id})">${holds}</g>
+    <g clip-path="url(#hullClip-${plan.id})">${holdBodies.join('')}</g>
     <path d="${hullPath}" fill="none" stroke="#111" stroke-width="2.5"/>
     ${dividers.join('')}
     <rect x="${hullX0-20}" y="${topY-70}" width="80" height="70" fill="#e5e7eb" stroke="#111" stroke-width="2"/>
     <line x1="${hullX0+18}" y1="${topY-70}" x2="${hullX0+18}" y2="${topY-100}" stroke="#111" stroke-width="3"/>
+    ${craneLayer.join('')}
   </svg>`;
 }
 
