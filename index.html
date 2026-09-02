@@ -2840,7 +2840,7 @@ function addHoldPlanEntry(){
   if(pick){ name = state.vessels.find(v=>v.id===pick).name; }
   else if(manual){ name = manual; }
   else { alert('اختر مركب أو اكتب اسمه'); return; }
-  const holds = Array.from({length:holdsCount}, (_,i)=>({index:i+1, craneNumber:'', loaderNumber:'', qty:'', done:false}));
+  const holds = Array.from({length:holdsCount}, (_,i)=>({index:i+1, craneNumber:'', loaderNumber:'', radioChannel:'', capacity:'', qty:'', done:false}));
   state.holdPlans.push({id:uid(), name, holdsCount, date:todayStr(), holds});
   log('مخطط عنابر','إضافة مركب',null,{name,holdsCount});
   saveState(); renderTab();
@@ -2862,7 +2862,7 @@ function updateHoldPlanCount(planId, newCount){
   const newHolds = [];
   for(let i=1;i<=newCount;i++){
     const existing = oldHolds.find(h=>h.index===i);
-    newHolds.push(existing || {index:i, craneNumber:'', loaderNumber:'', qty:'', done:false});
+    newHolds.push(existing || {index:i, craneNumber:'', loaderNumber:'', radioChannel:'', capacity:'', qty:'', done:false});
   }
   p.holds = newHolds;
   p.holdsCount = newCount;
@@ -2899,7 +2899,7 @@ function renderHoldPlanEntries(){
       <div class="row" style="justify-content:space-between; margin-bottom:12px;">
         <h2>🚢 مركب: <span style="color:var(--gold);">${esc(p.name)}</span></h2>
         <div class="row">
-          <button class="btn-ghost btn-sm" onclick="shareElement('holdPlanCapture-${p.id}','hold_plan_${esc(p.name)}_${todayStr()}.png','#ffffff')">📤 مشاركة الصورة</button>
+          <button class="btn-ghost btn-sm" onclick="shareElement('holdPlanCapture-${p.id}','hold_plan_${esc(p.name)}_${todayStr()}.png','#0b1220')">📤 مشاركة الصورة</button>
           <button class="btn-danger btn-sm" onclick="removeHoldPlanEntry('${esc(p.id)}')">حذف</button>
         </div>
       </div>
@@ -2927,8 +2927,16 @@ function renderHoldPlanEntries(){
                 ${loadersList.map(l=>`<option value="${esc(l.number)}" ${h.loaderNumber===l.number?'selected':''}>لودر ${esc(l.number)}</option>`).join('')}
               </select>
             </div>
-            <div class="field"><label>كمية البضاعة المتبقية</label>
-              <input value="${esc(h.qty||'')}" placeholder="مثال: 1200 طن" oninput="updateHoldField('${esc(p.id)}',${h.index},'qty',this.value)">
+            <div class="field"><label>موجه الراديو (يدوي)</label>
+              <input value="${esc(h.radioChannel||'')}" placeholder="مثال: CH 68" oninput="updateHoldField('${esc(p.id)}',${h.index},'radioChannel',this.value)">
+            </div>
+            <div class="g2" style="gap:8px;">
+              <div class="field"><label>أقصى سعة العنبر (طن)</label>
+                <input type="number" min="0" value="${esc(h.capacity||'')}" placeholder="مثال: 18000" oninput="updateHoldField('${esc(p.id)}',${h.index},'capacity',this.value)">
+              </div>
+              <div class="field"><label>الكمية الحالية (طن)</label>
+                <input type="number" min="0" value="${esc(h.qty||'')}" placeholder="مثال: 15000" oninput="updateHoldField('${esc(p.id)}',${h.index},'qty',this.value)">
+              </div>
             </div>
             <label class="row" style="gap:8px;cursor:pointer;margin-top:6px;">
               <input type="checkbox" ${h.done?'checked':''} onchange="toggleHoldDone('${esc(p.id)}',${h.index})">
@@ -2938,7 +2946,7 @@ function renderHoldPlanEntries(){
         `).join('')}
       </div>
 
-      <div id="holdPlanCapture-${p.id}" class="print-wrap" style="margin-top:16px;overflow-x:auto;">
+      <div id="holdPlanCapture-${p.id}" class="print-wrap" style="margin-top:16px;overflow-x:auto;background:#0b1220;padding:10px;border-radius:12px;">
         <div id="holdPlanSvg-${p.id}">${buildVesselSVG(p)}</div>
       </div>
     </div>
@@ -2955,34 +2963,45 @@ function craneIconSVG(cx, baseY, number){
   const bucketY = baseY - 92;
   return `
   <g>
-    <rect x="${cx-20}" y="${baseY-14}" width="40" height="14" rx="2" fill="#3a4048" stroke="#111" stroke-width="1"/>
-    <line x1="${cx-18}" y1="${baseY-14}" x2="${cx}" y2="${peakY}" stroke="#374151" stroke-width="4" stroke-linecap="round"/>
-    <line x1="${cx+18}" y1="${baseY-14}" x2="${cx}" y2="${peakY}" stroke="#374151" stroke-width="4" stroke-linecap="round"/>
-    <line x1="${cx}" y1="${baseY-14}" x2="${cx}" y2="${peakY}" stroke="#9ca3af" stroke-width="1.6"/>
-    <circle cx="${cx}" cy="${peakY}" r="4.5" fill="#111"/>
-    <line x1="${cx-4}" y1="${peakY+3}" x2="${cx-11}" y2="${bucketY-8}" stroke="#111" stroke-width="1.2"/>
-    <line x1="${cx+4}" y1="${peakY+3}" x2="${cx+11}" y2="${bucketY-8}" stroke="#111" stroke-width="1.2"/>
-    <path d="M ${cx-13},${bucketY-8} Q ${cx},${bucketY+7} ${cx+13},${bucketY-8} Q ${cx},${bucketY-18} ${cx-13},${bucketY-8} Z" fill="#4b5563" stroke="#111" stroke-width="1.1"/>
-    <circle cx="${cx}" cy="${badgeY}" r="15" fill="#0a84ff" stroke="#fff" stroke-width="2"/>
-    <text x="${cx}" y="${badgeY+5}" text-anchor="middle" font-size="13" font-weight="800" fill="#fff">${esc(number)}</text>
+    <rect x="${cx-21}" y="${baseY-16}" width="42" height="16" rx="2.5" fill="#22314a" stroke="#8fa3c2" stroke-width="1.2"/>
+    <line x1="${cx-18}" y1="${baseY-16}" x2="${cx}" y2="${peakY}" stroke="#cbd5e1" stroke-width="4" stroke-linecap="round"/>
+    <line x1="${cx+18}" y1="${baseY-16}" x2="${cx}" y2="${peakY}" stroke="#cbd5e1" stroke-width="4" stroke-linecap="round"/>
+    <line x1="${cx}" y1="${baseY-16}" x2="${cx}" y2="${peakY}" stroke="#64748b" stroke-width="1.6"/>
+    <circle cx="${cx}" cy="${peakY}" r="4.5" fill="#0b1220" stroke="#cbd5e1" stroke-width="1.2"/>
+    <line x1="${cx-4}" y1="${peakY+3}" x2="${cx-11}" y2="${bucketY-8}" stroke="#cbd5e1" stroke-width="1.2"/>
+    <line x1="${cx+4}" y1="${peakY+3}" x2="${cx+11}" y2="${bucketY-8}" stroke="#cbd5e1" stroke-width="1.2"/>
+    <path d="M ${cx-13},${bucketY-8} Q ${cx},${bucketY+7} ${cx+13},${bucketY-8} Q ${cx},${bucketY-18} ${cx-13},${bucketY-8} Z" fill="#3b4658" stroke="#cbd5e1" stroke-width="1.1"/>
+    <circle cx="${cx}" cy="${badgeY}" r="15" fill="#0ea5e9" stroke="#e6f6ff" stroke-width="2"/>
+    <text x="${cx}" y="${badgeY+5}" text-anchor="middle" font-size="13" font-weight="800" fill="#0b1220">${esc(number)}</text>
   </g>`;
 }
 
 function loaderIconSVG(cx, cy, number){
   return `
   <g>
-    <rect x="${cx-13}" y="${cy-32}" width="17" height="15" rx="2" fill="#f5c542" stroke="#111" stroke-width="1.2"/>
-    <rect x="${cx-15}" y="${cy-8}" width="46" height="19" rx="4" fill="#f5c542" stroke="#111" stroke-width="1.4"/>
-    <line x1="${cx+31}" y1="${cy-2}" x2="${cx+48}" y2="${cy-18}" stroke="#333" stroke-width="3" stroke-linecap="round"/>
-    <path d="M ${cx+44},${cy-20} Q ${cx+58},${cy-22} ${cx+56},${cy-10} Q ${cx+50},${cy-8} ${cx+44},${cy-14} Z" fill="#4b5563" stroke="#111" stroke-width="1.1"/>
-    <circle cx="${cx-6}" cy="${cy+13}" r="7.5" fill="#222" stroke="#666" stroke-width="1"/>
-    <circle cx="${cx+18}" cy="${cy+13}" r="7.5" fill="#222" stroke="#666" stroke-width="1"/>
-    <circle cx="${cx+6}" cy="${cy+34}" r="13" fill="#f5c542" stroke="#111" stroke-width="1.4"/>
-    <text x="${cx+6}" y="${cy+39}" text-anchor="middle" font-size="12" font-weight="800" fill="#111">${esc(number)}</text>
+    <rect x="${cx-13}" y="${cy-32}" width="17" height="15" rx="2" fill="#f5c542" stroke="#0b1220" stroke-width="1.2"/>
+    <rect x="${cx-15}" y="${cy-8}" width="46" height="19" rx="4" fill="#f5c542" stroke="#0b1220" stroke-width="1.4"/>
+    <line x1="${cx+31}" y1="${cy-2}" x2="${cx+48}" y2="${cy-18}" stroke="#3b4658" stroke-width="3" stroke-linecap="round"/>
+    <path d="M ${cx+44},${cy-20} Q ${cx+58},${cy-22} ${cx+56},${cy-10} Q ${cx+50},${cy-8} ${cx+44},${cy-14} Z" fill="#7a8598" stroke="#0b1220" stroke-width="1.1"/>
+    <circle cx="${cx-6}" cy="${cy+13}" r="7.5" fill="#1a2130" stroke="#9ca3af" stroke-width="1.2"/>
+    <circle cx="${cx+18}" cy="${cy+13}" r="7.5" fill="#1a2130" stroke="#9ca3af" stroke-width="1.2"/>
+    <circle cx="${cx+6}" cy="${cy+34}" r="13" fill="#f5c542" stroke="#0b1220" stroke-width="1.4"/>
+    <text x="${cx+6}" y="${cy+39}" text-anchor="middle" font-size="12" font-weight="800" fill="#0b1220">${esc(number)}</text>
   </g>`;
 }
 
+function cargoPileSVG(cellX0, cellX1, topY, bottomY, ratio){
+  if(ratio<=0) return '';
+  const innerUsable = (bottomY-topY) - 58;
+  const fillHeight = Math.max(8, innerUsable*Math.min(1,ratio));
+  const baseline = bottomY-8;
+  const peakY = baseline - fillHeight;
+  const x0 = cellX0+10, x1 = cellX1-10, w = x1-x0;
+  return `<path d="M ${x0},${baseline} Q ${x0+w*0.22},${peakY-6} ${x0+w*0.5},${peakY} Q ${x0+w*0.78},${peakY-6} ${x1},${baseline} Z" fill="#d99a44" fill-opacity="0.5" stroke="#e8b968" stroke-opacity="0.85" stroke-width="1.3"/>`;
+}
+
 function buildVesselSVG(plan){
+  const ar = currentLang()==='ar';
   const N = plan.holdsCount;
   const holdW = 130;
   const superW = 150;
@@ -3008,7 +3027,7 @@ function buildVesselSVG(plan){
   const dividers = [];
   for(let i=1;i<N;i++){
     const x = hullX0 + i*holdW;
-    dividers.push(`<line x1="${x}" y1="${topY}" x2="${x}" y2="${bottomY}" stroke="#333" stroke-width="1.5"/>`);
+    dividers.push(`<line x1="${x}" y1="${topY}" x2="${x}" y2="${bottomY}" stroke="#334155" stroke-width="1.5"/>`);
   }
 
   const holdBodies = [];
@@ -3019,18 +3038,33 @@ function buildVesselSVG(plan){
     const cellX0 = hullX0 + (N - h.index) * holdW;
     const cellX1 = cellX0 + holdW;
     const cellCx = (cellX0+cellX1)/2;
-    const fill = h.done ? '#bdeecb' : '#ffffff';
+    const fill = h.done ? '#123527' : '#101a2c';
+
+    const capacity = Number(h.capacity)||0;
+    const qty = Number(h.qty)||0;
+    const ratio = capacity>0 && qty>0 ? Math.min(1, qty/capacity) : 0;
+    const cargoPile = cargoPileSVG(cellX0, cellX1, topY, bottomY, ratio);
 
     const loaderIcon = h.loaderNumber ? loaderIconSVG(cellCx-16, topY+95, h.loaderNumber) : '';
-    const qtyText = h.qty ? `<text x="${cellCx}" y="${bottomY-16}" text-anchor="middle" font-size="13" font-weight="600" fill="#111">${esc(h.qty)}</text>` : '';
-    const doneMark = h.done ? `<text x="${cellX1-12}" y="${topY+24}" text-anchor="end" font-size="17" fill="#1a7f3c">✔</text>` : '';
+
+    let qtyText = '';
+    if(qty>0 && capacity>0){
+      qtyText = `<text x="${cellCx}" y="${bottomY-16}" text-anchor="middle" font-size="12.5" font-weight="700" fill="#f1f5f9">${qty.toLocaleString('en-US')} / ${capacity.toLocaleString('en-US')} ${ar?'طن':'t'}</text>`;
+    } else if(qty>0){
+      qtyText = `<text x="${cellCx}" y="${bottomY-16}" text-anchor="middle" font-size="12.5" font-weight="700" fill="#f1f5f9">${qty.toLocaleString('en-US')} ${ar?'طن':'t'}</text>`;
+    }
+
+    const radioText = h.radioChannel ? `<text x="${cellCx}" y="${topY+38}" text-anchor="middle" font-size="10.5" fill="#8fa3c2">${esc(h.radioChannel)}</text>` : '';
+    const doneText = h.done ? `<text x="${cellCx}" y="${topY+54}" text-anchor="middle" font-size="10.5" font-weight="800" fill="#34d399">${ar?'تم الانتهاء من العنبر':'Hold Completed'}</text>` : '';
 
     holdBodies.push(`
-      <rect x="${cellX0}" y="${topY}" width="${holdW}" height="${bottomY-topY}" fill="${fill}"/>
-      <text x="${cellCx}" y="${topY+22}" text-anchor="middle" font-size="13" font-weight="700" fill="#333">HOLD ${h.index}</text>
+      <rect x="${cellX0}" y="${topY}" width="${holdW}" height="${bottomY-topY}" fill="${fill}" stroke="${h.done?'#1f8f5c':'#1e293b'}" stroke-width="1"/>
+      ${cargoPile}
+      <text x="${cellCx}" y="${topY+22}" text-anchor="middle" font-size="13" font-weight="700" fill="#e2e8f0">HOLD ${h.index}</text>
+      ${radioText}
+      ${doneText}
       ${loaderIcon}
       ${qtyText}
-      ${doneMark}
     `);
 
     // Cranes stand ABOVE the deck line, so they must be drawn outside the
@@ -3041,14 +3075,17 @@ function buildVesselSVG(plan){
   });
 
   return `
-  <svg viewBox="0 0 ${totalW} ${totalH}" width="100%" style="max-width:${totalW}px;background:#fff;" xmlns="http://www.w3.org/2000/svg">
-    <text x="${totalW/2}" y="26" text-anchor="middle" font-size="18" font-weight="800" fill="#111">${esc(plan.name)} — ${esc(plan.date||todayStr())}</text>
+  <svg viewBox="0 0 ${totalW} ${totalH}" width="100%" style="max-width:${totalW}px;" xmlns="http://www.w3.org/2000/svg">
+    <rect x="0" y="0" width="${totalW}" height="${totalH}" fill="#0b1220"/>
+    <text x="${totalW/2}" y="26" text-anchor="middle" font-size="18" font-weight="800" fill="#e8b93f">${esc(plan.name)} — ${esc(plan.date||todayStr())}</text>
     <clipPath id="hullClip-${plan.id}"><path d="${hullPath}"/></clipPath>
     <g clip-path="url(#hullClip-${plan.id})">${holdBodies.join('')}</g>
-    <path d="${hullPath}" fill="none" stroke="#111" stroke-width="2.5"/>
+    <path d="${hullPath}" fill="none" stroke="#cbd5e1" stroke-width="2.5"/>
     ${dividers.join('')}
-    <rect x="${hullX0-20}" y="${topY-70}" width="80" height="70" fill="#e5e7eb" stroke="#111" stroke-width="2"/>
-    <line x1="${hullX0+18}" y1="${topY-70}" x2="${hullX0+18}" y2="${topY-100}" stroke="#111" stroke-width="3"/>
+    <rect x="${hullX0-20}" y="${topY-70}" width="80" height="70" fill="#1a2436" stroke="#cbd5e1" stroke-width="2"/>
+    <rect x="${hullX0-12}" y="${topY-60}" width="18" height="14" rx="2" fill="#0b1220" stroke="#64748b" stroke-width="1"/>
+    <rect x="${hullX0+14}" y="${topY-60}" width="18" height="14" rx="2" fill="#0b1220" stroke="#64748b" stroke-width="1"/>
+    <line x1="${hullX0+18}" y1="${topY-70}" x2="${hullX0+18}" y2="${topY-100}" stroke="#cbd5e1" stroke-width="3"/>
     ${craneLayer.join('')}
   </svg>`;
 }
