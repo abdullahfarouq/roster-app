@@ -3044,7 +3044,10 @@ function buildVesselSVG(plan){
 
     const capacity = Number(h.capacity)||0;
     const qty = Number(h.qty)||0;
-    const ratio = capacity>0 && qty>0 ? Math.min(1, qty/capacity) : 0;
+    // If a capacity was entered, show the pile proportional to it. Otherwise,
+    // as long as a quantity was typed, still show a pile at a sensible default
+    // height just to indicate "there is cargo here" — never nothing.
+    const ratio = qty>0 ? (capacity>0 ? Math.min(1, qty/capacity) : 0.55) : 0;
     const cargoPile = cargoPileSVG(cellX0, cellX1, topY, bottomY, ratio);
 
     const loaderIcon = h.loaderNumber ? loaderIconSVG(cellCx-16, topY+95, h.loaderNumber) : '';
