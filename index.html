@@ -3004,24 +3004,26 @@ function buildVesselSVG(plan){
   const ar = currentLang()==='ar';
   const N = plan.holdsCount;
   const holdW = 130;
-  const superW = 150;
-  const bowLen = 90;
-  const topY = 190, bottomY = 400, midY = (topY+bottomY)/2;
+  const superW = 155;
+  const bowLen = 105;
+  const topY = 200, bottomY = 400, midY = (topY+bottomY)/2;
   const hullX0 = superW;
   const hullX1 = hullX0 + N*holdW;
   const bowTipX = hullX1 + bowLen;
-  const totalW = bowTipX + 40;
-  const totalH = 460;
+  const totalW = bowTipX + 50;
+  const totalH = 480;
+  const wlY = bottomY + 18; // waterline
 
+  // Smooth raked bow (bezier) + rounded stern quarter, instead of straight angles.
   const hullPath = `
     M ${hullX0},${topY}
     L ${hullX1},${topY}
-    L ${bowTipX},${midY}
-    L ${hullX1},${bottomY}
+    C ${hullX1+bowLen*0.6},${topY} ${hullX1+bowLen*0.98},${topY+(midY-topY)*0.5} ${bowTipX},${midY}
+    C ${hullX1+bowLen*0.98},${midY+(bottomY-midY)*0.5} ${hullX1+bowLen*0.6},${bottomY} ${hullX1},${bottomY}
     L ${hullX0},${bottomY}
-    Q ${hullX0-38},${bottomY} ${hullX0-38},${bottomY-40}
-    L ${hullX0-38},${topY+30}
-    Q ${hullX0-38},${topY} ${hullX0},${topY}
+    Q ${hullX0-40},${bottomY} ${hullX0-40},${bottomY-42}
+    L ${hullX0-40},${topY+32}
+    Q ${hullX0-40},${topY} ${hullX0},${topY}
     Z`;
 
   const dividers = [];
@@ -3038,7 +3040,7 @@ function buildVesselSVG(plan){
     const cellX0 = hullX0 + (N - h.index) * holdW;
     const cellX1 = cellX0 + holdW;
     const cellCx = (cellX0+cellX1)/2;
-    const fill = h.done ? '#123527' : '#101a2c';
+    const fill = h.done ? '#123527' : 'url(#holdGrad-'+plan.id+')';
 
     const capacity = Number(h.capacity)||0;
     const qty = Number(h.qty)||0;
@@ -3059,6 +3061,7 @@ function buildVesselSVG(plan){
 
     holdBodies.push(`
       <rect x="${cellX0}" y="${topY}" width="${holdW}" height="${bottomY-topY}" fill="${fill}" stroke="${h.done?'#1f8f5c':'#1e293b'}" stroke-width="1"/>
+      <rect x="${cellX0+7}" y="${topY+7}" width="${holdW-14}" height="${(bottomY-topY)-14}" fill="none" stroke="#33415580" stroke-width="1" stroke-dasharray="3 4"/>
       ${cargoPile}
       <text x="${cellCx}" y="${topY+22}" text-anchor="middle" font-size="13" font-weight="700" fill="#e2e8f0">HOLD ${h.index}</text>
       ${radioText}
@@ -3074,18 +3077,74 @@ function buildVesselSVG(plan){
     }
   });
 
+  // Bollards along the deck edge at each hold divider, for a more engineered deck look.
+  const bollards = [];
+  for(let i=0;i<=N;i++){
+    const x = hullX0 + i*holdW;
+    if(x>hullX0+4 && x<hullX1-4) bollards.push(`<circle cx="${x}" cy="${topY-4}" r="2.6" fill="#94a3b8"/>`);
+  }
+
+  // Simple wave ripples along the waterline for a finished, professional look.
+  let waveD = `M 0,${wlY}`;
+  for(let x=0; x<=totalW; x+=26){ waveD += ` q 13,${x%52===0?7:-7} 26,0`; }
+
   return `
   <svg viewBox="0 0 ${totalW} ${totalH}" width="100%" style="max-width:${totalW}px;" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <linearGradient id="hullGrad-${plan.id}" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#3d4c66"/>
+        <stop offset="55%" stop-color="#25314a"/>
+        <stop offset="100%" stop-color="#131b2c"/>
+      </linearGradient>
+      <linearGradient id="holdGrad-${plan.id}" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#16233a"/>
+        <stop offset="100%" stop-color="#0d1626"/>
+      </linearGradient>
+      <linearGradient id="superGrad-${plan.id}" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#2c3a54"/>
+        <stop offset="100%" stop-color="#182236"/>
+      </linearGradient>
+      <filter id="shadow-${plan.id}" x="-20%" y="-20%" width="140%" height="140%">
+        <feDropShadow dx="0" dy="8" stdDeviation="8" flood-color="#000" flood-opacity="0.45"/>
+      </filter>
+    </defs>
+
     <rect x="0" y="0" width="${totalW}" height="${totalH}" fill="#0b1220"/>
-    <text x="${totalW/2}" y="26" text-anchor="middle" font-size="18" font-weight="800" fill="#e8b93f">${esc(plan.name)} — ${esc(plan.date||todayStr())}</text>
-    <clipPath id="hullClip-${plan.id}"><path d="${hullPath}"/></clipPath>
-    <g clip-path="url(#hullClip-${plan.id})">${holdBodies.join('')}</g>
-    <path d="${hullPath}" fill="none" stroke="#cbd5e1" stroke-width="2.5"/>
-    ${dividers.join('')}
-    <rect x="${hullX0-20}" y="${topY-70}" width="80" height="70" fill="#1a2436" stroke="#cbd5e1" stroke-width="2"/>
-    <rect x="${hullX0-12}" y="${topY-60}" width="18" height="14" rx="2" fill="#0b1220" stroke="#64748b" stroke-width="1"/>
-    <rect x="${hullX0+14}" y="${topY-60}" width="18" height="14" rx="2" fill="#0b1220" stroke="#64748b" stroke-width="1"/>
-    <line x1="${hullX0+18}" y1="${topY-70}" x2="${hullX0+18}" y2="${topY-100}" stroke="#cbd5e1" stroke-width="3"/>
+    <rect x="16" y="8" width="${totalW-32}" height="34" rx="8" fill="#111a2c" stroke="#22314a" stroke-width="1"/>
+    <text x="${totalW/2}" y="30" text-anchor="middle" font-size="18" font-weight="800" fill="#e8b93f">${esc(plan.name)} — ${esc(plan.date||todayStr())}</text>
+
+    <g filter="url(#shadow-${plan.id})">
+      <path d="${hullPath}" fill="url(#hullGrad-${plan.id})"/>
+      <clipPath id="hullClip-${plan.id}"><path d="${hullPath}"/></clipPath>
+      <g clip-path="url(#hullClip-${plan.id})">${holdBodies.join('')}</g>
+      <path d="${hullPath}" fill="none" stroke="#cbd5e1" stroke-width="2.5"/>
+      ${dividers.join('')}
+      ${bollards.join('')}
+
+      <!-- bow hawsepipe / anchor detail -->
+      <circle cx="${hullX1+bowLen*0.42}" cy="${midY-24}" r="6" fill="none" stroke="#94a3b8" stroke-width="2"/>
+
+      <!-- superstructure block -->
+      <rect x="${hullX0-22}" y="${topY-92}" width="86" height="92" rx="4" fill="url(#superGrad-${plan.id})" stroke="#cbd5e1" stroke-width="2"/>
+      <rect x="${hullX0-10}" y="${topY-78}" width="14" height="12" rx="2" fill="#f4c542" fill-opacity="0.85" stroke="#0b1220" stroke-width="1"/>
+      <rect x="${hullX0+9}" y="${topY-78}" width="14" height="12" rx="2" fill="#f4c542" fill-opacity="0.85" stroke="#0b1220" stroke-width="1"/>
+      <rect x="${hullX0-10}" y="${topY-58}" width="14" height="12" rx="2" fill="#f4c542" fill-opacity="0.55" stroke="#0b1220" stroke-width="1"/>
+      <rect x="${hullX0+9}" y="${topY-58}" width="14" height="12" rx="2" fill="#f4c542" fill-opacity="0.55" stroke="#0b1220" stroke-width="1"/>
+
+      <!-- funnel with brand-accent stripe -->
+      <rect x="${hullX0+40}" y="${topY-118}" width="22" height="30" rx="3" fill="#22314a" stroke="#cbd5e1" stroke-width="1.4"/>
+      <rect x="${hullX0+40}" y="${topY-110}" width="22" height="7" fill="#e8b93f"/>
+
+      <!-- mast with radar -->
+      <line x1="${hullX0+18}" y1="${topY-92}" x2="${hullX0+18}" y2="${topY-128}" stroke="#cbd5e1" stroke-width="2.4"/>
+      <line x1="${hullX0+4}" y1="${topY-118}" x2="${hullX0+32}" y2="${topY-118}" stroke="#cbd5e1" stroke-width="2"/>
+      <ellipse cx="${hullX0+18}" cy="${topY-128}" rx="6" ry="3" fill="none" stroke="#94a3b8" stroke-width="1.6"/>
+    </g>
+
+    <!-- waterline -->
+    <path d="${waveD}" fill="none" stroke="#2563eb" stroke-opacity="0.55" stroke-width="2.4"/>
+    <rect x="0" y="${wlY+4}" width="${totalW}" height="${totalH-wlY-4}" fill="#0d1b33" fill-opacity="0.35"/>
+
     ${craneLayer.join('')}
   </svg>`;
 }
