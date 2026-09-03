@@ -7,6 +7,8 @@
 <meta name="mobile-web-app-capable" content="yes">
 <title>Roster - نظام إدارة وتخطيط الموانئ</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
 :root {
   /* الألوان الأساسية للخلفيات */
@@ -641,6 +643,7 @@ const I18N = {
     home:'Home', share:'Share as image',
     tab_crew:'Operations & Equipment', tab_pier:'Berth Plan', tab_roster:'Shift Schedule',
     tab_calendar:'Rotation Table', tab_leaves:'Leaves', tab_handover:'Handover', tab_settings:'Settings',
+    tab_holdplan:'Hold Plan', tab_kpi:'Performance & KPIs', tab_reports:'Activity Log',
     login_title:'Sign in to save & sync your data', login_name:'Name', login_phone:'Phone (optional)',
     login_email:'Email (optional)', login_btn:'Sign in', login_hint:'Use the same name/phone from any device to retrieve your saved data.'
   },
@@ -648,6 +651,7 @@ const I18N = {
     home:'الرئيسية', share:'مشاركة كصورة',
     tab_crew:'التشغيل والمعدات', tab_pier:'خطة الأرصفة', tab_roster:'جدول الوردية',
     tab_calendar:'جدول المناوبات', tab_leaves:'الإجازات', tab_handover:'التسليم والتسلم', tab_settings:'الإعدادات',
+    tab_holdplan:'مخطط العنابر', tab_kpi:'الأداء والـ KPIs', tab_reports:'سجل العمليات',
     login_title:'سجّل الدخول لحفظ ومزامنة بياناتك', login_name:'الاسم', login_phone:'رقم التليفون (اختياري)',
     login_email:'البريد الإلكتروني (اختياري)', login_btn:'دخول', login_hint:'استخدم نفس الاسم أو رقم التليفون من أي جهاز لاسترجاع بياناتك المحفوظة.'
   }
@@ -683,8 +687,15 @@ function blankState(loginId,name,phone,email){
     yard:{ name:'', notes:'' },
     rosterDates:{},
     logs:[],
-    geminiApiKey:''
+    geminiApiKey:'',
+    kpi:{ vesselLogs:[], incidents:[], breakdowns:[] }
   };
+}
+function ensureKPI(){
+  if(!state.kpi) state.kpi = {vesselLogs:[], incidents:[], breakdowns:[]};
+  if(!state.kpi.vesselLogs) state.kpi.vesselLogs = [];
+  if(!state.kpi.incidents) state.kpi.incidents = [];
+  if(!state.kpi.breakdowns) state.kpi.breakdowns = [];
 }
 
 function saveState(){
@@ -720,6 +731,7 @@ function tryLogin(){
       if(!state.holdPlans) state.holdPlans = [];
       if(!state.yard) state.yard = {name:'', notes:''};
       if(!state.lang) state.lang = localStorage.getItem('roster_lang') || 'en';
+      ensureKPI();
     } else {
       state = blankState(loginId, name, phone, email);
     }
@@ -747,6 +759,7 @@ function checkAutoLogin(){
         if(!state.holdPlans) state.holdPlans = [];
         if(!state.yard) state.yard = {name:'', notes:''};
         if(!state.lang) state.lang = localStorage.getItem('roster_lang') || 'en';
+        ensureKPI();
         document.documentElement.setAttribute('lang', state.lang);
         document.documentElement.setAttribute('dir', state.lang==='ar'?'rtl':'ltr');
       }
@@ -788,6 +801,8 @@ const TABS = [
   {id:'leaves', label:'الإجازات', icon:'🌴'},
   {id:'handover', label:'التسليم والتسلم', icon:'🔄'},
   {id:'holdplan', label:'مخطط العنابر', icon:'🚢'},
+  {id:'kpi', label:'الأداء والـ KPIs', icon:'📊'},
+  {id:'reports', label:'سجل العمليات', icon:'🧾'},
   {id:'settings', label:'الإعدادات', icon:'⚙️'},
 ];
 
@@ -833,9 +848,12 @@ function renderTab(){
   else if(currentTab==='leaves') c.innerHTML = viewLeaves();
   else if(currentTab==='handover') c.innerHTML = viewHandover();
   else if(currentTab==='holdplan') c.innerHTML = viewHoldPlan();
+  else if(currentTab==='kpi') c.innerHTML = viewKPI();
+  else if(currentTab==='reports') c.innerHTML = viewReports();
   else if(currentTab==='settings') c.innerHTML = viewSettings();
   bindTabEvents();
   applyDynamicTableSizing();
+  if(currentTab==='kpi') renderKPICharts();
 }
 
 /* =========================================================
@@ -3185,6 +3203,531 @@ function shareHandoverTable(){
 }
 
 /* ===================== REPORTS ===================== */
+/* ===================== KPI & PERFORMANCE MODULE ===================== */
+const DELAY_CODES = [
+  {id:'hatch',  ar:'تأخر فتح/تسكير العنابر',           en:'Hatch open/close delay'},
+  {id:'maint',  ar:'صيانة طارئة',                      en:'Emergency maintenance'},
+  {id:'weather',ar:'سوء أحوال جوية',                   en:'Bad weather'},
+  {id:'trucks', ar:'نقص شاحنات النقل الداخلي',          en:'Shortage of internal trucks'},
+  {id:'other',  ar:'أخرى',                              en:'Other'}
+];
+const CARGO_TYPES = [
+  {id:'containers', ar:'حاويات', en:'Containers'},
+  {id:'bulk',        ar:'بضائع صب',  en:'Bulk cargo'},
+  {id:'general',      ar:'بضائع عامة', en:'General cargo'},
+  {id:'liquid',       ar:'بضائع سائلة', en:'Liquid cargo'},
+  {id:'roro',          ar:'رورو',       en:'RoRo'}
+];
+let kpiSubTab = 'log';
+let kpiDraft = { craneEntries: [], delays: [] };
+let kpiReportPeriod = '24h';
+let kpiChartInstances = {};
+
+function switchKPISubTab(id){ kpiSubTab = id; renderTab(); }
+
+function viewKPI(){
+  ensureKPI();
+  const ar = currentLang()==='ar';
+  const subtabs = [
+    {id:'log', ar:'تسجيل وردية / مركب', en:'Vessel / Shift Log'},
+    {id:'incidents', ar:'الحوادث والسلامة', en:'HSE & Incidents'},
+    {id:'breakdowns', ar:'أعطال وصيانة الأوناش', en:'Crane Breakdowns'},
+    {id:'dashboard', ar:'لوحة الأداء والرسوم البيانية', en:'Dashboard & Charts'},
+    {id:'export', ar:'التقارير والتصدير', en:'Reports & Export'}
+  ];
+  return `
+  <h1>📊 ${ar?'الأداء ومؤشرات الأداء الرئيسية (KPIs)':'Performance & KPIs'}</h1>
+  <div class="tabs" style="margin-bottom:16px;flex-wrap:wrap;">
+    ${subtabs.map(s=>`<div class="tab ${kpiSubTab===s.id?'active':''}" onclick="switchKPISubTab('${s.id}')">${ar?s.ar:s.en}</div>`).join('')}
+  </div>
+  <div id="kpiSubContent">
+    ${kpiSubTab==='log' ? renderKPILogForm() : ''}
+    ${kpiSubTab==='incidents' ? renderKPIIncidents() : ''}
+    ${kpiSubTab==='breakdowns' ? renderKPIBreakdowns() : ''}
+    ${kpiSubTab==='dashboard' ? renderKPIDashboard() : ''}
+    ${kpiSubTab==='export' ? renderKPIExport() : ''}
+  </div>`;
+}
+
+/* ---------- Vessel / Shift log ---------- */
+function renderKPILogForm(){
+  const ar = currentLang()==='ar';
+  const cranes = state.crew.cranes || [];
+  const operators = state.crew.operators || [];
+  return `
+  <div class="card" style="margin-bottom:16px;">
+    <h2>🚢 ${ar?'بيانات المركب والحمولة':'Vessel & Cargo Data'}</h2>
+    <div class="g2">
+      <div class="field"><label>${ar?'المركب':'Vessel'}</label>
+        <select id="kpiVessel">
+          <option value="">${ar?'اختر مركب مسجل (اختياري)':'Pick a registered vessel (optional)'}</option>
+          ${state.vessels.map(v=>`<option value="${esc(v.id)}">${esc(v.name)}</option>`).join('')}
+        </select>
+      </div>
+      <div class="field"><label>${ar?'اسم المركب (لو غير مسجل)':'Vessel name (if not listed)'}</label><input id="kpiVesselName" placeholder="${ar?'اسم المركب':'Vessel name'}"></div>
+      <div class="field"><label>${ar?'التاريخ':'Date'}</label><input id="kpiDate" type="date" value="${todayStr()}"></div>
+      <div class="field"><label>${ar?'الوردية':'Shift'}</label><input id="kpiShift" value="${esc(state.shiftName||'')}"></div>
+      <div class="field"><label>${ar?'عدد العنابر':'Number of holds'}</label><input id="kpiHolds" type="number" min="1" placeholder="4"></div>
+      <div class="field"><label>${ar?'نوع البضاعة':'Cargo type'}</label>
+        <select id="kpiCargoType">${CARGO_TYPES.map(c=>`<option value="${c.id}">${ar?c.ar:c.en}</option>`).join('')}</select>
+      </div>
+      <div class="field"><label>${ar?'إجمالي الحمولة (طن)':'Total cargo (tons)'}</label><input id="kpiTotalCargo" type="number" min="0" placeholder="0"></div>
+      <div class="field"><label>${ar?'حالة الطقس':'Weather condition'}</label>
+        <select id="kpiWeather">
+          <option value="clear">${ar?'صافي':'Clear'}</option>
+          <option value="cloudy">${ar?'غائم':'Cloudy'}</option>
+          <option value="rain">${ar?'أمطار':'Rain'}</option>
+          <option value="storm">${ar?'عاصفة':'Storm'}</option>
+        </select>
+      </div>
+      <div class="field"><label>${ar?'سرعة الرياح (كم/س)':'Wind speed (km/h)'}</label><input id="kpiWind" type="number" min="0" placeholder="0"></div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-bottom:16px;">
+    <div class="row" style="justify-content:space-between;">
+      <h2>🏗️ ${ar?'توزيع الأوناش والمشغلين ومعدلات التفريغ':'Crane / Operator Assignment & Discharge Rates'}</h2>
+      <button class="btn-ghost btn-sm" onclick="addKPICraneRow()">+ ${ar?'إضافة ونش':'Add crane'}</button>
+    </div>
+    ${!kpiDraft.craneEntries.length ? `<div class="empty muted">${ar?'أضف الأوناش المستخدمة في هذه الوردية':'Add the cranes used in this shift'}</div>` : ''}
+    ${kpiDraft.craneEntries.map((e,i)=>`
+      <div class="crane-block">
+        <div class="g2">
+          <div class="field"><label>${ar?'الونش':'Crane'}</label>
+            <select onchange="updateKPICraneRow(${i},'craneId',this.value)">
+              <option value="">--</option>
+              ${cranes.map(c=>`<option value="${esc(c.id)}" ${e.craneId===c.id?'selected':''}>${esc(c.name||c.number||c.id)}</option>`).join('')}
+            </select>
+          </div>
+          <div class="field"><label>${ar?'المشغل':'Operator'}</label>
+            <select onchange="updateKPICraneRow(${i},'operatorId',this.value)">
+              <option value="">--</option>
+              ${operators.map(o=>`<option value="${esc(o.id)}" ${e.operatorId===o.id?'selected':''}>${esc(o.name)}</option>`).join('')}
+            </select>
+          </div>
+          <div class="field"><label>${ar?'عدد الساعات':'Hours worked'}</label><input type="number" min="0" step="0.5" value="${e.hours||''}" oninput="updateKPICraneRow(${i},'hours',this.value)"></div>
+          <div class="field"><label>${ar?'عدد الحركات (Moves)':'Moves count'}</label><input type="number" min="0" value="${e.moves||''}" oninput="updateKPICraneRow(${i},'moves',this.value)"></div>
+          <div class="field"><label>${ar?'الأطنان المنقولة':'Tons moved'}</label><input type="number" min="0" value="${e.tons||''}" oninput="updateKPICraneRow(${i},'tons',this.value)"></div>
+          <div class="field"><label class="muted">${ar?'المعدل المحسوب':'Computed rate'}</label>
+            <div class="muted" style="padding-top:8px;">
+              ${e.hours>0 ? `${(e.moves/e.hours).toFixed(1)} ${ar?'حركة/ساعة':'moves/hr'} — ${(e.tons/e.hours).toFixed(1)} ${ar?'طن/ساعة':'tons/hr'}` : (ar?'أدخل الساعات':'enter hours')}
+            </div>
+          </div>
+        </div>
+        <button class="btn-danger btn-sm" onclick="removeKPICraneRow(${i})">🗑️ ${ar?'حذف':'Remove'}</button>
+      </div>`).join('')}
+  </div>
+
+  <div class="card" style="margin-bottom:16px;">
+    <div class="row" style="justify-content:space-between;">
+      <h2>⏱️ ${ar?'أسباب التوقفات غير المستهدفة':'Delay Breakdown'}</h2>
+      <button class="btn-ghost btn-sm" onclick="addKPIDelayRow()">+ ${ar?'إضافة سبب توقف':'Add delay'}</button>
+    </div>
+    ${!kpiDraft.delays.length ? `<div class="empty muted">${ar?'لا توجد توقفات مسجلة':'No delays logged'}</div>` : ''}
+    ${kpiDraft.delays.map((d,i)=>`
+      <div class="crane-block">
+        <div class="g2">
+          <div class="field"><label>${ar?'السبب':'Reason'}</label>
+            <select onchange="updateKPIDelayRow(${i},'code',this.value)">
+              ${DELAY_CODES.map(c=>`<option value="${c.id}" ${d.code===c.id?'selected':''}>${ar?c.ar:c.en}</option>`).join('')}
+            </select>
+          </div>
+          <div class="field"><label>${ar?'المدة (دقيقة)':'Duration (minutes)'}</label><input type="number" min="0" value="${d.minutes||''}" oninput="updateKPIDelayRow(${i},'minutes',this.value)"></div>
+          <div class="field" style="grid-column:1/-1;"><label>${ar?'ملاحظة':'Note'}</label><input value="${esc(d.note||'')}" oninput="updateKPIDelayRow(${i},'note',this.value)"></div>
+        </div>
+        <button class="btn-danger btn-sm" onclick="removeKPIDelayRow(${i})">🗑️ ${ar?'حذف':'Remove'}</button>
+      </div>`).join('')}
+  </div>
+
+  <button class="btn-gold" style="width:100%;" onclick="saveKPIVesselLog()">💾 ${ar?'حفظ سجل الوردية':'Save shift log'}</button>
+
+  <div class="card" style="margin-top:20px;">
+    <h2>📋 ${ar?'آخر السجلات':'Recent logs'}</h2>
+    ${renderKPIVesselLogList()}
+  </div>`;
+}
+function addKPICraneRow(){ kpiDraft.craneEntries.push({id:uid(), craneId:'', operatorId:'', hours:0, moves:0, tons:0}); renderTab(); }
+function updateKPICraneRow(i, field, val){
+  const e = kpiDraft.craneEntries[i]; if(!e) return;
+  e[field] = (field==='hours'||field==='moves'||field==='tons') ? parseFloat(val)||0 : val;
+  renderTab();
+}
+function removeKPICraneRow(i){ kpiDraft.craneEntries.splice(i,1); renderTab(); }
+function addKPIDelayRow(){ kpiDraft.delays.push({id:uid(), code:'other', minutes:0, note:''}); renderTab(); }
+function updateKPIDelayRow(i, field, val){
+  const d = kpiDraft.delays[i]; if(!d) return;
+  d[field] = field==='minutes' ? (parseFloat(val)||0) : val;
+  renderTab();
+}
+function removeKPIDelayRow(i){ kpiDraft.delays.splice(i,1); renderTab(); }
+
+function saveKPIVesselLog(){
+  ensureKPI();
+  const ar = currentLang()==='ar';
+  const cranes = state.crew.cranes||[], operators = state.crew.operators||[];
+  const vesselId = document.getElementById('kpiVessel').value;
+  const vesselNameManual = document.getElementById('kpiVesselName').value.trim();
+  const vesselName = vesselNameManual || (state.vessels.find(v=>v.id===vesselId)||{}).name || (ar?'مركب غير مسمى':'Unnamed vessel');
+  const entry = {
+    id: uid(), createdAt: new Date().toISOString(),
+    date: document.getElementById('kpiDate').value || todayStr(),
+    shiftName: document.getElementById('kpiShift').value || state.shiftName,
+    vesselId: vesselId||null, vesselName,
+    holdsCount: parseInt(document.getElementById('kpiHolds').value)||0,
+    cargoType: document.getElementById('kpiCargoType').value,
+    totalCargoTons: parseFloat(document.getElementById('kpiTotalCargo').value)||0,
+    weather: document.getElementById('kpiWeather').value,
+    windSpeed: parseFloat(document.getElementById('kpiWind').value)||0,
+    craneEntries: kpiDraft.craneEntries.map(e=>({
+      ...e,
+      craneName: (cranes.find(c=>c.id===e.craneId)||{}).name || (cranes.find(c=>c.id===e.craneId)||{}).number || '',
+      operatorName: (operators.find(o=>o.id===e.operatorId)||{}).name || ''
+    })),
+    delays: kpiDraft.delays.slice(),
+    user: state.name
+  };
+  if(!entry.craneEntries.length && !entry.totalCargoTons){
+    alert(ar?'من فضلك أدخل بيانات الحمولة أو ونش واحد على الأقل':'Please enter cargo data or at least one crane entry');
+    return;
+  }
+  state.kpi.vesselLogs.unshift(entry);
+  log('kpi_vessel_log','create',null,`${vesselName} - ${entry.date}`);
+  saveState();
+  kpiDraft = { craneEntries: [], delays: [] };
+  document.getElementById('kpiVesselName') && (document.getElementById('kpiVesselName').value='');
+  renderTab();
+}
+function removeKPIVesselLog(id){
+  const ar = currentLang()==='ar';
+  if(!confirm(ar?'حذف هذا السجل؟':'Delete this log?')) return;
+  state.kpi.vesselLogs = state.kpi.vesselLogs.filter(l=>l.id!==id);
+  log('kpi_vessel_log','delete',id,null);
+  saveState(); renderTab();
+}
+function renderKPIVesselLogList(){
+  const ar = currentLang()==='ar';
+  const logs = (state.kpi.vesselLogs||[]).slice(0,15);
+  if(!logs.length) return `<div class="empty muted">${ar?'لا توجد سجلات بعد':'No logs yet'}</div>`;
+  return logs.map(l=>{
+    const totalMoves = l.craneEntries.reduce((s,e)=>s+(e.moves||0),0);
+    const totalHrs = l.craneEntries.reduce((s,e)=>s+(e.hours||0),0);
+    const totalDelayMin = (l.delays||[]).reduce((s,d)=>s+(d.minutes||0),0);
+    return `
+    <div class="list-item">
+      <div>
+        <div class="row"><b style="color:var(--gold);">${esc(l.vesselName)}</b> — <span class="muted">${esc(l.date)} · ${esc(l.shiftName)}</span></div>
+        <div class="muted">${ar?'الحمولة':'Cargo'}: ${l.totalCargoTons} ${ar?'طن':'t'} · ${ar?'الأوناش':'Cranes'}: ${l.craneEntries.length} · ${ar?'حركات':'Moves'}: ${totalMoves} · ${ar?'معدل':'Rate'}: ${totalHrs>0?(totalMoves/totalHrs).toFixed(1):'-'} ${ar?'حركة/س':'m/hr'} · ${ar?'توقف':'Delay'}: ${totalDelayMin} ${ar?'د':'min'}</div>
+      </div>
+      <button class="btn-danger btn-sm" onclick="removeKPIVesselLog('${esc(l.id)}')">🗑️</button>
+    </div>`;
+  }).join('');
+}
+
+/* ---------- HSE / Incidents ---------- */
+function renderKPIIncidents(){
+  const ar = currentLang()==='ar';
+  const cranes = state.crew.cranes||[];
+  const list = state.kpi.incidents||[];
+  return `
+  <div class="card" style="margin-bottom:16px;">
+    <h2>⚠️ ${ar?'تسجيل حادث / ملاحظة سلامة':'Log incident / safety note'}</h2>
+    <div class="g2">
+      <div class="field"><label>${ar?'التاريخ':'Date'}</label><input id="incDate" type="date" value="${todayStr()}"></div>
+      <div class="field"><label>${ar?'الونش المرتبط (اختياري)':'Related crane (optional)'}</label>
+        <select id="incCrane"><option value="">--</option>${cranes.map(c=>`<option value="${esc(c.id)}">${esc(c.name||c.number||c.id)}</option>`).join('')}</select>
+      </div>
+      <div class="field"><label>${ar?'النوع':'Type'}</label>
+        <select id="incType">
+          <option value="near_miss">${ar?'حالة وشيكة (Near Miss)':'Near miss'}</option>
+          <option value="incident">${ar?'حادث':'Incident'}</option>
+          <option value="stoppage">${ar?'توقف طارئ':'Emergency stoppage'}</option>
+        </select>
+      </div>
+      <div class="field"><label>${ar?'درجة الخطورة':'Severity'}</label>
+        <select id="incSeverity">
+          <option value="low">${ar?'منخفضة':'Low'}</option>
+          <option value="medium">${ar?'متوسطة':'Medium'}</option>
+          <option value="high">${ar?'عالية':'High'}</option>
+        </select>
+      </div>
+      <div class="field" style="grid-column:1/-1;"><label>${ar?'الوصف':'Description'}</label><textarea id="incDesc" rows="3" placeholder="${ar?'وصف موجز للحادثة...':'Brief description...'}"></textarea></div>
+    </div>
+    <button class="btn-gold" style="width:100%;margin-top:10px;" onclick="saveKPIIncident()">💾 ${ar?'حفظ':'Save'}</button>
+  </div>
+  <div class="card">
+    <h2>📋 ${ar?'سجل الحوادث والملاحظات':'Incident log'}</h2>
+    ${!list.length?`<div class="empty muted">${ar?'لا توجد حوادث مسجلة':'No incidents logged'}</div>`:
+      list.map(i=>`
+      <div class="list-item">
+        <div>
+          <div class="row"><b style="color:${i.severity==='high'?'#ff5555':(i.severity==='medium'?'#ffb020':'var(--gold)')};">${esc(typeLabel(i.type,ar))}</b> — <span class="muted">${esc(i.date)} ${i.craneName?('· '+esc(i.craneName)):''}</span></div>
+          <div>${esc(i.description)}</div>
+          <div class="audit">${ar?'بواسطة':'By'}: ${esc(i.user||'-')}</div>
+        </div>
+        <button class="btn-danger btn-sm" onclick="removeKPIIncident('${esc(i.id)}')">🗑️</button>
+      </div>`).join('')}
+  </div>`;
+}
+function typeLabel(type, ar){
+  const map = {near_miss:[ar?'حالة وشيكة':'Near miss'], incident:[ar?'حادث':'Incident'], stoppage:[ar?'توقف طارئ':'Stoppage']};
+  return (map[type]||[type])[0];
+}
+function saveKPIIncident(){
+  ensureKPI();
+  const cranes = state.crew.cranes||[];
+  const craneId = document.getElementById('incCrane').value;
+  const desc = document.getElementById('incDesc').value.trim();
+  const ar = currentLang()==='ar';
+  if(!desc){ alert(ar?'من فضلك أدخل وصف الحادثة':'Please enter a description'); return; }
+  const entry = {
+    id: uid(), createdAt: new Date().toISOString(), date: document.getElementById('incDate').value||todayStr(),
+    craneId: craneId||null, craneName: (cranes.find(c=>c.id===craneId)||{}).name||'',
+    type: document.getElementById('incType').value, severity: document.getElementById('incSeverity').value,
+    description: desc, user: state.name
+  };
+  state.kpi.incidents.unshift(entry);
+  log('kpi_incident','create',null,desc.slice(0,60));
+  saveState(); renderTab();
+}
+function removeKPIIncident(id){
+  state.kpi.incidents = state.kpi.incidents.filter(i=>i.id!==id);
+  log('kpi_incident','delete',id,null);
+  saveState(); renderTab();
+}
+
+/* ---------- Crane breakdowns / OEE ---------- */
+function renderKPIBreakdowns(){
+  const ar = currentLang()==='ar';
+  const cranes = state.crew.cranes||[];
+  const list = state.kpi.breakdowns||[];
+  return `
+  <div class="card" style="margin-bottom:16px;">
+    <h2>🔧 ${ar?'تسجيل عطل / توقف معدة':'Log equipment breakdown'}</h2>
+    <div class="g2">
+      <div class="field"><label>${ar?'التاريخ':'Date'}</label><input id="bkDate" type="date" value="${todayStr()}"></div>
+      <div class="field"><label>${ar?'الونش':'Crane'}</label>
+        <select id="bkCrane"><option value="">--</option>${cranes.map(c=>`<option value="${esc(c.id)}">${esc(c.name||c.number||c.id)}</option>`).join('')}</select>
+      </div>
+      <div class="field"><label>${ar?'نوع العطل':'Fault type'}</label>
+        <select id="bkType">
+          <option value="mechanical">${ar?'ميكانيكي':'Mechanical'}</option>
+          <option value="electrical">${ar?'كهربائي':'Electrical'}</option>
+          <option value="other">${ar?'أخرى':'Other'}</option>
+        </select>
+      </div>
+      <div class="field"><label>${ar?'مدة التوقف (دقيقة)':'Downtime (minutes)'}</label><input id="bkDowntime" type="number" min="0" placeholder="0"></div>
+      <div class="field"><label>${ar?'مدة الوردية المخططة (دقيقة)':'Planned shift time (minutes)'}</label><input id="bkPlanned" type="number" min="1" value="720"></div>
+      <div class="field" style="grid-column:1/-1;"><label>${ar?'سبب العطل':'Cause / notes'}</label><textarea id="bkNote" rows="2"></textarea></div>
+    </div>
+    <button class="btn-gold" style="width:100%;margin-top:10px;" onclick="saveKPIBreakdown()">💾 ${ar?'حفظ':'Save'}</button>
+  </div>
+  <div class="card">
+    <h2>📋 ${ar?'سجل الأعطال والتوقفات':'Breakdown log'}</h2>
+    ${!list.length?`<div class="empty muted">${ar?'لا توجد أعطال مسجلة':'No breakdowns logged'}</div>`:
+      list.map(b=>{
+        const oee = b.plannedMinutes>0 ? Math.max(0,((b.plannedMinutes-b.downtimeMinutes)/b.plannedMinutes)*100) : 100;
+        return `
+      <div class="list-item">
+        <div>
+          <div class="row"><b style="color:var(--gold);">${esc(b.craneName)}</b> — <span class="muted">${esc(b.date)} · ${esc(b.type==='mechanical'?(ar?'ميكانيكي':'Mechanical'):b.type==='electrical'?(ar?'كهربائي':'Electrical'):(ar?'أخرى':'Other'))}</span></div>
+          <div>${esc(b.note||'')}</div>
+          <div class="muted">${ar?'توقف':'Downtime'}: ${b.downtimeMinutes} ${ar?'د':'min'} · OEE: ${oee.toFixed(1)}%</div>
+        </div>
+        <button class="btn-danger btn-sm" onclick="removeKPIBreakdown('${esc(b.id)}')">🗑️</button>
+      </div>`;}).join('')}
+  </div>`;
+}
+function saveKPIBreakdown(){
+  ensureKPI();
+  const ar = currentLang()==='ar';
+  const cranes = state.crew.cranes||[];
+  const craneId = document.getElementById('bkCrane').value;
+  if(!craneId){ alert(ar?'من فضلك اختر الونش':'Please select a crane'); return; }
+  const entry = {
+    id: uid(), createdAt: new Date().toISOString(), date: document.getElementById('bkDate').value||todayStr(),
+    craneId, craneName: (cranes.find(c=>c.id===craneId)||{}).name || (cranes.find(c=>c.id===craneId)||{}).number || '',
+    type: document.getElementById('bkType').value,
+    downtimeMinutes: parseFloat(document.getElementById('bkDowntime').value)||0,
+    plannedMinutes: parseFloat(document.getElementById('bkPlanned').value)||720,
+    note: document.getElementById('bkNote').value.trim(), user: state.name
+  };
+  state.kpi.breakdowns.unshift(entry);
+  log('kpi_breakdown','create',null,`${entry.craneName} - ${entry.downtimeMinutes}min`);
+  saveState(); renderTab();
+}
+function removeKPIBreakdown(id){
+  state.kpi.breakdowns = state.kpi.breakdowns.filter(b=>b.id!==id);
+  log('kpi_breakdown','delete',id,null);
+  saveState(); renderTab();
+}
+
+/* ---------- Dashboard / Charts ---------- */
+function renderKPIDashboard(){
+  const ar = currentLang()==='ar';
+  return `
+  <div class="card" style="margin-bottom:16px;">
+    <h2>🏗️ ${ar?'مقارنة أداء الأوناش (طن/ساعة)':'Crane performance comparison (tons/hr)'}</h2>
+    <canvas id="chartCranePerf" height="120"></canvas>
+  </div>
+  <div class="card" style="margin-bottom:16px;">
+    <h2>📈 ${ar?'معدل التفريغ عبر الأيام':'Discharge rate over days'}</h2>
+    <canvas id="chartDischargeRate" height="120"></canvas>
+  </div>
+  <div class="card">
+    <h2>🛠️ ${ar?'زمن التوقف حسب الونش (دقيقة)':'Downtime by crane (minutes)'}</h2>
+    <canvas id="chartDowntime" height="120"></canvas>
+  </div>`;
+}
+function destroyKPICharts(){
+  Object.values(kpiChartInstances).forEach(c=>{ try{ c.destroy(); }catch(e){} });
+  kpiChartInstances = {};
+}
+function renderKPICharts(){
+  if(kpiSubTab!=='dashboard' || typeof Chart==='undefined') return;
+  ensureKPI();
+  destroyKPICharts();
+  const ar = currentLang()==='ar';
+  const logs = state.kpi.vesselLogs||[];
+
+  // Crane performance
+  const craneAgg = {};
+  logs.forEach(l=> l.craneEntries.forEach(e=>{
+    const key = e.craneName || e.craneId || '?';
+    if(!craneAgg[key]) craneAgg[key] = {tons:0, hours:0};
+    craneAgg[key].tons += e.tons||0; craneAgg[key].hours += e.hours||0;
+  }));
+  const craneLabels = Object.keys(craneAgg);
+  const craneRates = craneLabels.map(k=> craneAgg[k].hours>0 ? +(craneAgg[k].tons/craneAgg[k].hours).toFixed(2) : 0);
+  const c1 = document.getElementById('chartCranePerf');
+  if(c1) kpiChartInstances.c1 = new Chart(c1, {
+    type:'bar',
+    data:{ labels: craneLabels.length?craneLabels:[ar?'لا بيانات':'No data'], datasets:[{label: ar?'طن/ساعة':'tons/hr', data: craneRates.length?craneRates:[0], backgroundColor:'#0A84FF'}] },
+    options:{ responsive:true, plugins:{legend:{display:false}} }
+  });
+
+  // Discharge rate over days
+  const dayAgg = {};
+  logs.forEach(l=>{
+    if(!dayAgg[l.date]) dayAgg[l.date] = {tons:0, hours:0};
+    l.craneEntries.forEach(e=>{ dayAgg[l.date].tons += e.tons||0; dayAgg[l.date].hours += e.hours||0; });
+  });
+  const days = Object.keys(dayAgg).sort();
+  const dayRates = days.map(d=> dayAgg[d].hours>0 ? +(dayAgg[d].tons/dayAgg[d].hours).toFixed(2) : 0);
+  const c2 = document.getElementById('chartDischargeRate');
+  if(c2) kpiChartInstances.c2 = new Chart(c2, {
+    type:'line',
+    data:{ labels: days.length?days:[ar?'لا بيانات':'No data'], datasets:[{label: ar?'طن/ساعة':'tons/hr', data: dayRates.length?dayRates:[0], borderColor:'#FFD166', backgroundColor:'rgba(255,209,102,.25)', tension:.3, fill:true}] },
+    options:{ responsive:true, plugins:{legend:{display:false}} }
+  });
+
+  // Downtime by crane
+  const downAgg = {};
+  (state.kpi.breakdowns||[]).forEach(b=>{
+    const key = b.craneName || b.craneId || '?';
+    downAgg[key] = (downAgg[key]||0) + (b.downtimeMinutes||0);
+  });
+  const downLabels = Object.keys(downAgg);
+  const downVals = downLabels.map(k=>downAgg[k]);
+  const c3 = document.getElementById('chartDowntime');
+  if(c3) kpiChartInstances.c3 = new Chart(c3, {
+    type:'bar',
+    data:{ labels: downLabels.length?downLabels:[ar?'لا بيانات':'No data'], datasets:[{label: ar?'دقائق التوقف':'downtime (min)', data: downVals.length?downVals:[0], backgroundColor:'#FF5555'}] },
+    options:{ responsive:true, plugins:{legend:{display:false}}, indexAxis:'y' }
+  });
+}
+
+/* ---------- Reports & Export ---------- */
+function periodStartDate(period){
+  const now = new Date();
+  if(period==='12h') return new Date(now.getTime()-12*3600*1000);
+  if(period==='24h') return new Date(now.getTime()-24*3600*1000);
+  if(period==='week') return new Date(now.getTime()-7*24*3600*1000);
+  if(period==='month') return new Date(now.getFullYear(), now.getMonth(), 1);
+  if(period==='year') return new Date(now.getFullYear(), 0, 1);
+  return new Date(0);
+}
+function filterKPIByPeriod(){
+  ensureKPI();
+  const start = periodStartDate(kpiReportPeriod);
+  const inRange = (iso)=> new Date(iso) >= start;
+  return {
+    vesselLogs: (state.kpi.vesselLogs||[]).filter(l=>inRange(l.createdAt)),
+    incidents: (state.kpi.incidents||[]).filter(i=>inRange(i.createdAt)),
+    breakdowns: (state.kpi.breakdowns||[]).filter(b=>inRange(b.createdAt))
+  };
+}
+function setKPIPeriod(p){ kpiReportPeriod = p; renderTab(); }
+function renderKPIExport(){
+  const ar = currentLang()==='ar';
+  const {vesselLogs, incidents, breakdowns} = filterKPIByPeriod();
+  const totalTons = vesselLogs.reduce((s,l)=>s+l.craneEntries.reduce((s2,e)=>s2+(e.tons||0),0),0);
+  const totalMoves = vesselLogs.reduce((s,l)=>s+l.craneEntries.reduce((s2,e)=>s2+(e.moves||0),0),0);
+  const totalHours = vesselLogs.reduce((s,l)=>s+l.craneEntries.reduce((s2,e)=>s2+(e.hours||0),0),0);
+  const totalDowntime = breakdowns.reduce((s,b)=>s+(b.downtimeMinutes||0),0);
+  const avgOEE = breakdowns.length ? (breakdowns.reduce((s,b)=> s+(b.plannedMinutes>0?Math.max(0,((b.plannedMinutes-b.downtimeMinutes)/b.plannedMinutes)*100):100),0)/breakdowns.length) : 100;
+  const periods = [
+    {id:'12h', ar:'آخر 12 ساعة', en:'Last 12h'},
+    {id:'24h', ar:'آخر 24 ساعة', en:'Last 24h'},
+    {id:'week', ar:'آخر أسبوع', en:'Last week'},
+    {id:'month', ar:'هذا الشهر', en:'This month'},
+    {id:'year', ar:'هذه السنة', en:'This year'},
+    {id:'all', ar:'كل البيانات', en:'All time'}
+  ];
+  return `
+  <div class="card" style="margin-bottom:16px;">
+    <h2>🗓️ ${ar?'اختر الفترة':'Select period'}</h2>
+    <div class="row" style="flex-wrap:wrap;gap:8px;">
+      ${periods.map(p=>`<button class="btn-nav ${kpiReportPeriod===p.id?'active':''}" onclick="setKPIPeriod('${p.id}')">${ar?p.ar:p.en}</button>`).join('')}
+    </div>
+  </div>
+  <div id="kpiReportCapture" class="print-wrap" style="margin-bottom:16px;">
+    <h2 style="color:#000;">${ar?'ملخص الأداء':'Performance summary'}</h2>
+    <table class="rt-table"><tbody>
+      <tr><td>${ar?'إجمالي الأطنان':'Total tons'}</td><td><b>${totalTons.toFixed(1)}</b></td></tr>
+      <tr><td>${ar?'إجمالي الحركات':'Total moves'}</td><td><b>${totalMoves}</b></td></tr>
+      <tr><td>${ar?'متوسط طن/ساعة':'Avg tons/hr'}</td><td><b>${totalHours>0?(totalTons/totalHours).toFixed(2):'-'}</b></td></tr>
+      <tr><td>${ar?'متوسط حركة/ساعة':'Avg moves/hr'}</td><td><b>${totalHours>0?(totalMoves/totalHours).toFixed(2):'-'}</b></td></tr>
+      <tr><td>${ar?'عدد سجلات الوردية':'Shift logs'}</td><td><b>${vesselLogs.length}</b></td></tr>
+      <tr><td>${ar?'عدد الحوادث/الملاحظات':'Incidents logged'}</td><td><b>${incidents.length}</b></td></tr>
+      <tr><td>${ar?'إجمالي دقائق التوقف':'Total downtime (min)'}</td><td><b>${totalDowntime}</b></td></tr>
+      <tr><td>${ar?'متوسط كفاءة المعدات (OEE)':'Avg equipment efficiency (OEE)'}</td><td><b>${avgOEE.toFixed(1)}%</b></td></tr>
+    </tbody></table>
+  </div>
+  <div class="row" style="gap:10px;flex-wrap:wrap;">
+    <button class="btn-gold" onclick="exportKPIExcel()">📊 ${ar?'تصدير Excel':'Export Excel'}</button>
+    <button class="btn-ghost" onclick="shareElement('kpiReportCapture','kpi_report_${todayStr()}.png','#ffffff')">🖼️ ${ar?'تصدير صورة / PDF':'Export image / PDF'}</button>
+  </div>`;
+}
+function exportKPIExcel(){
+  const ar = currentLang()==='ar';
+  if(typeof XLSX==='undefined'){ alert(ar?'تعذر تحميل مكتبة التصدير':'Export library failed to load'); return; }
+  const {vesselLogs, incidents, breakdowns} = filterKPIByPeriod();
+  const wb = XLSX.utils.book_new();
+
+  const logRows = [];
+  vesselLogs.forEach(l=>{
+    if(!l.craneEntries.length){
+      logRows.push({Date:l.date, Shift:l.shiftName, Vessel:l.vesselName, Cargo_Tons:l.totalCargoTons, Weather:l.weather, Wind_kmh:l.windSpeed, Crane:'', Operator:'', Hours:'', Moves:'', Tons:'', Tons_per_hr:''});
+    } else {
+      l.craneEntries.forEach(e=>{
+        logRows.push({Date:l.date, Shift:l.shiftName, Vessel:l.vesselName, Cargo_Tons:l.totalCargoTons, Weather:l.weather, Wind_kmh:l.windSpeed,
+          Crane:e.craneName, Operator:e.operatorName, Hours:e.hours, Moves:e.moves, Tons:e.tons, Tons_per_hr: e.hours>0?+(e.tons/e.hours).toFixed(2):0});
+      });
+    }
+  });
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(logRows), 'Vessel Shift Logs');
+
+  const delayRows = [];
+  vesselLogs.forEach(l=> (l.delays||[]).forEach(d=> delayRows.push({Date:l.date, Vessel:l.vesselName, Reason:d.code, Minutes:d.minutes, Note:d.note})));
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(delayRows.length?delayRows:[{Date:'',Vessel:'',Reason:'',Minutes:'',Note:''}]), 'Delays');
+
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(incidents.length?incidents.map(i=>({Date:i.date,Type:i.type,Severity:i.severity,Crane:i.craneName,Description:i.description,By:i.user})):[{Date:'',Type:'',Severity:'',Crane:'',Description:'',By:''}]), 'HSE Incidents');
+
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(breakdowns.length?breakdowns.map(b=>({Date:b.date,Crane:b.craneName,Type:b.type,Downtime_min:b.downtimeMinutes,Planned_min:b.plannedMinutes,OEE_pct: b.plannedMinutes>0?+Math.max(0,((b.plannedMinutes-b.downtimeMinutes)/b.plannedMinutes)*100).toFixed(1):100, Note:b.note})):[{Date:'',Crane:'',Type:'',Downtime_min:'',Planned_min:'',OEE_pct:'',Note:''}]), 'Breakdowns & OEE');
+
+  XLSX.writeFile(wb, `KPI_Report_${kpiReportPeriod}_${todayStr()}.xlsx`);
+}
+
 function viewReports(){
   return `
   <div id="captureArea">
