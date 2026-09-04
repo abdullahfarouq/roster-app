@@ -706,6 +706,12 @@ function ensureKPI(){
   if(!state.kpi.incidents) state.kpi.incidents = [];
   if(!state.kpi.breakdowns) state.kpi.breakdowns = [];
 }
+function ensureCrewExtras(){
+  if(!state.crew) state.crew = { operators:[], loaders:[], forklifts:[], cranes:[], other:[] };
+  if(!state.crew.supervisors) state.crew.supervisors = [];
+  if(!state.crew.departments) state.crew.departments = [];
+  if(!state.supplies) state.supplies = [];
+}
 function ensureYardData(){
   if(!state.yardData) state.yardData = {yards:[], transactions:[]};
   if(!state.yardData.yards) state.yardData.yards = [];
@@ -784,7 +790,7 @@ function connectFirebase(){
       state = remote.data;
       if(keepLoginId) state.loginId = keepLoginId;
       if(keepName) state.name = keepName;
-      ensureKPI(); ensureYardData();
+      ensureKPI(); ensureYardData(); ensureCrewExtras();
       if(!state.holdPlans) state.holdPlans = [];
       fbLocalRev = remote.rev||fbLocalRev;
       try{ localStorage.setItem(keyFor(state.loginId), JSON.stringify(state)); }catch(e){}
@@ -855,7 +861,7 @@ function tryLogin(){
       if(!state.holdPlans) state.holdPlans = [];
       if(!state.yard) state.yard = {name:'', notes:''};
       if(!state.lang) state.lang = localStorage.getItem('roster_lang') || 'en';
-      ensureKPI(); ensureYardData();
+      ensureKPI(); ensureYardData(); ensureCrewExtras();
     } else {
       state = blankState(loginId, name, phone, email);
     }
@@ -884,7 +890,7 @@ function checkAutoLogin(){
         if(!state.holdPlans) state.holdPlans = [];
         if(!state.yard) state.yard = {name:'', notes:''};
         if(!state.lang) state.lang = localStorage.getItem('roster_lang') || 'en';
-        ensureKPI(); ensureYardData();
+        ensureKPI(); ensureYardData(); ensureCrewExtras();
         document.documentElement.setAttribute('lang', state.lang);
         document.documentElement.setAttribute('dir', state.lang==='ar'?'rtl':'ltr');
         connectFirebase();
@@ -3628,7 +3634,7 @@ function currentKPIVesselName(){
 function setKPIVessel(field, val){ kpiDraft[field] = val; renderTab(); }
 
 function viewKPI(){
-  ensureKPI(); ensureYardData();
+  ensureKPI(); ensureYardData(); ensureCrewExtras();
   const ar = currentLang()==='ar';
   const subtabs = [
     {id:'log', ar:'تسجيل وردية / مركب', en:'Vessel / Shift Log'},
@@ -3805,7 +3811,7 @@ function updateKPIDelayRow(i, field, val){
 function removeKPIDelayRow(i){ kpiDraft.delays.splice(i,1); renderTab(); }
 
 function saveKPIVesselLog(){
-  ensureKPI(); ensureYardData();
+  ensureKPI(); ensureYardData(); ensureCrewExtras();
   const ar = currentLang()==='ar';
   const cranes = state.crew.cranes||[], operators = state.crew.operators||[];
   const vesselId = kpiDraft.vesselId||'';
@@ -3959,7 +3965,7 @@ function typeLabel(type, ar){
   return (map[type]||[type])[0];
 }
 function saveKPIIncident(){
-  ensureKPI(); ensureYardData();
+  ensureKPI(); ensureYardData(); ensureCrewExtras();
   const cranes = state.crew.cranes||[];
   const craneId = document.getElementById('incCrane').value;
   const desc = document.getElementById('incDesc').value.trim();
@@ -4034,7 +4040,7 @@ function renderKPIBreakdowns(){
   </div>`;
 }
 function saveKPIBreakdown(){
-  ensureKPI(); ensureYardData();
+  ensureKPI(); ensureYardData(); ensureCrewExtras();
   const ar = currentLang()==='ar';
   const cranes = state.crew.cranes||[];
   const craneId = document.getElementById('bkCrane').value;
@@ -4080,7 +4086,7 @@ function destroyKPICharts(){
 }
 function renderKPICharts(){
   if(kpiSubTab!=='dashboard' || typeof Chart==='undefined') return;
-  ensureKPI(); ensureYardData();
+  ensureKPI(); ensureYardData(); ensureCrewExtras();
   destroyKPICharts();
   const ar = currentLang()==='ar';
   const logs = state.kpi.vesselLogs||[];
@@ -4143,7 +4149,7 @@ function periodStartDate(period){
   return new Date(0);
 }
 function filterKPIByPeriod(){
-  ensureKPI(); ensureYardData();
+  ensureKPI(); ensureYardData(); ensureCrewExtras();
   const start = periodStartDate(kpiReportPeriod);
   const inRange = (iso)=> new Date(iso) >= start;
   return {
