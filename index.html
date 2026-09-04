@@ -1467,9 +1467,25 @@ const SUPPLY_UNITS = [
   {id:'box', ar:'كرتونة', en:'box'},
   {id:'piece', ar:'قطعة', en:'piece'}
 ];
+/* All named people already in the system, from every module that stores a
+   person — used to populate "who received it" pickers instead of retyping
+   names. Deduplicated, sorted, with each person's role for clarity. */
+function getAllPeopleInSystem(){
+  const list = [];
+  (state.crew.operators||[]).forEach(o=>list.push({name:o.name, role: currentLang()==='ar'?'وناش':'Crane operator'}));
+  (state.crew.supervisors||[]).forEach(s=>list.push({name:s.name, role: currentLang()==='ar'?'مشرف':'Supervisor'}));
+  (state.crew.departments||[]).forEach(d=>(d.members||[]).forEach(m=>list.push({name:m.name, role:d.name})));
+  const seen = new Set();
+  return list.filter(p=>{
+    const key = p.name.trim().toLowerCase();
+    if(!key || seen.has(key)) return false;
+    seen.add(key); return true;
+  }).sort((a,b)=>a.name.localeCompare(b.name,'ar'));
+}
 function renderSuppliesSection(){
   const ar = currentLang()==='ar';
   if(!state.supplies) state.supplies = [];
+  const people = getAllPeopleInSystem();
   return `
   <div class="card" style="margin-bottom:16px;">
     <h3>🧾 ${ar?'تسجيل صرفية':'Log an issue/consumption'}</h3>
@@ -1483,6 +1499,14 @@ function renderSuppliesSection(){
       <div class="field"><label>${ar?'الوحدة':'Unit'}</label>
         <select id="supplyUnit">${SUPPLY_UNITS.map(u=>`<option value="${u.id}">${ar?u.ar:u.en}</option>`).join('')}</select>
       </div>
+      <div class="field"><label>${ar?'المستلم':'Recipient'}</label>
+        <select id="supplyRecipient" onchange="toggleSupplyRecipientOther(this.value)">
+          <option value="">${ar?'-- اختر الاسم --':'-- Pick a name --'}</option>
+          ${people.map(p=>`<option value="${esc(p.name)}">${esc(p.name)} — ${esc(p.role)}</option>`).join('')}
+          <option value="__other__">${ar?'اسم مش موجود في القائمة...':'Name not in the list...'}</option>
+        </select>
+      </div>
+      <div class="field" id="supplyRecipientOtherWrap" style="display:none;"><label>${ar?'اكتب الاسم':'Enter the name'}</label><input id="supplyRecipientOther" placeholder="${ar?'اسم المستلم':'Recipient name'}"></div>
       <div class="field" style="grid-column:1/-1;"><label>${ar?'ملاحظة':'Note'}</label><input id="supplyNote" placeholder="${ar?'مثال: عهدة غرفة المشرفين':'e.g. Supervisors room supply'}"></div>
     </div>
     <button class="btn-gold" style="width:100%;margin-top:10px;" onclick="saveSupplyEntry()">💾 ${ar?'حفظ':'Save'}</button>
@@ -1492,6 +1516,10 @@ function renderSuppliesSection(){
     ${renderSuppliesList()}
   </div>`;
 }
+function toggleSupplyRecipientOther(val){
+  const wrap = document.getElementById('supplyRecipientOtherWrap');
+  if(wrap) wrap.style.display = val==='__other__' ? '' : 'none';
+}
 function saveSupplyEntry(){
   const ar = currentLang()==='ar';
   if(!state.supplies) state.supplies = [];
@@ -1499,12 +1527,15 @@ function saveSupplyEntry(){
   const itemOther = document.getElementById('supplyItemOther').value.trim();
   const qty = parseFloat(document.getElementById('supplyQty').value)||0;
   if(qty<=0){ alert(ar?'من فضلك أدخل كمية أكبر من صفر':'Please enter a quantity greater than zero'); return; }
+  const recipientSel = document.getElementById('supplyRecipient').value;
+  const recipient = recipientSel==='__other__' ? document.getElementById('supplyRecipientOther').value.trim() : recipientSel;
+  if(!recipient){ alert(ar?'من فضلك اختر أو اكتب اسم المستلم':'Please pick or enter a recipient name'); return; }
   const itemDef = SUPPLY_ITEMS.find(i=>i.id===itemId);
   const itemLabel = (itemId==='other' && itemOther) ? itemOther : (ar?itemDef.ar:itemDef.en);
   const entry = {
     id: uid(), createdAt: new Date().toISOString(), date: document.getElementById('supplyDate').value||todayStr(),
     item: itemId, itemLabel, quantity: qty, unit: document.getElementById('supplyUnit').value,
-    note: document.getElementById('supplyNote').value.trim(), user: state.name
+    recipient, note: document.getElementById('supplyNote').value.trim(), user: state.name
   };
   state.supplies.unshift(entry);
   log('عهدة ومصروفات','إضافة',null,entry);
@@ -1526,7 +1557,7 @@ function renderSuppliesList(){
     <div class="list-item">
       <div>
         <div class="row"><b style="color:var(--gold);">${esc(s.itemLabel)}</b> — <span class="muted">${esc(s.date)}</span></div>
-        <div class="muted">${s.quantity} ${unitLabel(s.unit)}${s.note?(' · '+esc(s.note)):''} · ${ar?'بواسطة':'by'} ${esc(s.user||'-')}</div>
+        <div class="muted">${s.quantity} ${unitLabel(s.unit)}${s.recipient?(' · '+(ar?'المستلم':'To')+': '+esc(s.recipient)):''}${s.note?(' · '+esc(s.note)):''} · ${ar?'بواسطة':'by'} ${esc(s.user||'-')}</div>
       </div>
       <button class="btn-danger btn-sm" onclick="deleteSupplyEntry('${esc(s.id)}')">🗑️</button>
     </div>`).join('');
@@ -2089,6 +2120,7 @@ function addCraneInline(date, vId){
     operators: [],
     equipment: []
   });
+  syncHoldPlanFromRoster(rv.name, craneNumber, hold);
   saveState();
   renderTab();
 }
@@ -2102,9 +2134,13 @@ function removeVesselFromRoster(date,vId){
 
 function updateCraneField(date,vId,crId,field,value){
   const roster = getRoster(date);
-  const cr = roster.vessels.find(v=>v.id===vId).cranes.find(c=>c.id===crId);
+  const rv = roster.vessels.find(v=>v.id===vId);
+  const cr = rv.cranes.find(c=>c.id===crId);
   const before = {...cr};
   cr[field] = value.trim()||'-';
+  if((field==='hold' || field==='craneNumber') && cr.craneNumber && cr.hold && cr.hold!=='-'){
+    syncHoldPlanFromRoster(rv.name, cr.craneNumber, cr.hold);
+  }
   log('روستر','تعديل بيانات الونش',before,cr);
   saveState(); renderTab();
 }
@@ -3236,6 +3272,7 @@ function reassignCrane(planId, craneNumber, fromHoldIndex, toHoldIndex){
   if(to.craneNumber){ if(!confirm(`عنبر ${to.index} فيه ونش ${to.craneNumber} بالفعل، عايز تستبدله؟`)) return; }
   from.craneNumber = '';
   to.craneNumber = craneNumber;
+  syncRosterFromHoldPlan(p.name, craneNumber, toHoldIndex);
   log('مخطط عنابر','نقل ونش', {hold:from.index}, {hold:to.index, crane:craneNumber});
   saveState(); renderTab();
 }
@@ -3269,6 +3306,7 @@ function updateHoldField(planId, holdIndex, field, value){
   const h = p.holds.find(x=>x.index===holdIndex);
   if(!h) return;
   h[field] = value;
+  if(field==='craneNumber' && value){ syncRosterFromHoldPlan(p.name, value, holdIndex); }
   saveState();
   const svgBox = document.getElementById(`holdPlanSvg-${planId}`);
   if(svgBox) svgBox.innerHTML = buildVesselSVG(p);
@@ -3325,8 +3363,8 @@ function renderHoldPlanEntries(){
           <span class="pill ${p.opType==='load'?'pill-B':'pill-A'}" style="margin-inline-start:8px;">${p.opType==='load'?'🔼 شحن':'🔽 تفريغ'}</span>
         </h2>
         <div class="row">
-          <button class="btn-ghost btn-sm" onclick="shareElement('holdPlanCapture-${p.id}','hold_plan_${esc(p.name)}_${todayStr()}.png','#0b1220')">📤 مشاركة الصورة</button>
-          <button class="btn-ghost btn-sm" onclick="shareElementAsPDF('holdPlanCapture-${p.id}','hold_plan_${esc(p.name)}_${todayStr()}.pdf','#0b1220')">📄 PDF</button>
+          <button class="btn-ghost btn-sm" onclick="shareHoldPlanImage('${esc(p.id)}','hold_plan_${esc(p.name)}_${todayStr()}.png')">📤 مشاركة الصورة</button>
+          <button class="btn-ghost btn-sm" onclick="shareHoldPlanPDF('${esc(p.id)}','hold_plan_${esc(p.name)}_${todayStr()}.pdf')">📄 PDF</button>
           <button class="btn-danger btn-sm" onclick="removeHoldPlanEntry('${esc(p.id)}')">حذف</button>
         </div>
       </div>
@@ -3408,7 +3446,7 @@ function craneIconSVG(cx, baseY, number){
   const badgeY = baseY - 34;
   const bucketY = baseY - 92;
   return `
-  <g>
+  <g transform="translate(${cx},${baseY}) scale(1.35) translate(${-cx},${-baseY})">
     <rect x="${cx-21}" y="${baseY-16}" width="42" height="16" rx="2.5" fill="#22314a" stroke="#8fa3c2" stroke-width="1.2"/>
     <line x1="${cx-18}" y1="${baseY-16}" x2="${cx}" y2="${peakY}" stroke="#cbd5e1" stroke-width="4" stroke-linecap="round"/>
     <line x1="${cx+18}" y1="${baseY-16}" x2="${cx}" y2="${peakY}" stroke="#cbd5e1" stroke-width="4" stroke-linecap="round"/>
@@ -3424,7 +3462,7 @@ function craneIconSVG(cx, baseY, number){
 
 function loaderIconSVG(cx, cy, number){
   return `
-  <g>
+  <g transform="translate(${cx},${cy}) scale(1.35) translate(${-cx},${-cy})">
     <rect x="${cx-13}" y="${cy-32}" width="17" height="15" rx="2" fill="#f5c542" stroke="#0b1220" stroke-width="1.2"/>
     <rect x="${cx-15}" y="${cy-8}" width="46" height="19" rx="4" fill="#f5c542" stroke="#0b1220" stroke-width="1.4"/>
     <line x1="${cx+31}" y1="${cy-2}" x2="${cx+48}" y2="${cy-18}" stroke="#3b4658" stroke-width="3" stroke-linecap="round"/>
@@ -3500,21 +3538,21 @@ function buildVesselSVG(plan){
 
     let qtyText = '';
     if(qty>0 && capacity>0){
-      qtyText = `<text x="${cellCx}" y="${bottomY-28}" text-anchor="middle" font-size="12.5" font-weight="700" fill="#f1f5f9">~${qty.toLocaleString('en-US')} / ${capacity.toLocaleString('en-US')} ${ar?'طن':'t'}</text>
-        <text x="${cellCx}" y="${bottomY-13}" text-anchor="middle" font-size="9.5" font-style="italic" fill="#8fa3c2">${ar?'(كمية تقريبية)':'(approx. quantity)'}</text>`;
+      qtyText = `<text x="${cellCx}" y="${bottomY-28}" text-anchor="middle" font-size="16" font-weight="700" fill="#f1f5f9">~${qty.toLocaleString('en-US')} / ${capacity.toLocaleString('en-US')} ${ar?'طن':'t'}</text>
+        <text x="${cellCx}" y="${bottomY-13}" text-anchor="middle" font-size="12" font-style="italic" fill="#8fa3c2">${ar?'(كمية تقريبية)':'(approx. quantity)'}</text>`;
     } else if(qty>0){
-      qtyText = `<text x="${cellCx}" y="${bottomY-28}" text-anchor="middle" font-size="12.5" font-weight="700" fill="#f1f5f9">~${qty.toLocaleString('en-US')} ${ar?'طن':'t'}</text>
-        <text x="${cellCx}" y="${bottomY-13}" text-anchor="middle" font-size="9.5" font-style="italic" fill="#8fa3c2">${ar?'(كمية تقريبية)':'(approx. quantity)'}</text>`;
+      qtyText = `<text x="${cellCx}" y="${bottomY-28}" text-anchor="middle" font-size="16" font-weight="700" fill="#f1f5f9">~${qty.toLocaleString('en-US')} ${ar?'طن':'t'}</text>
+        <text x="${cellCx}" y="${bottomY-13}" text-anchor="middle" font-size="12" font-style="italic" fill="#8fa3c2">${ar?'(كمية تقريبية)':'(approx. quantity)'}</text>`;
     }
 
-    const radioText = h.radioChannel ? `<text x="${cellCx}" y="${topY+38}" text-anchor="middle" font-size="10" fill="#8fa3c2">📻 ${ar?'موجه الراديو':'Radio Ch.'}: ${esc(h.radioChannel)}</text>` : '';
-    const doneText = h.done ? `<text x="${cellCx}" y="${topY+54}" text-anchor="middle" font-size="10.5" font-weight="800" fill="#34d399">${ar?'تم الانتهاء من العنبر':'Hold Completed'}</text>` : '';
+    const radioText = h.radioChannel ? `<text x="${cellCx}" y="${topY+38}" text-anchor="middle" font-size="13" fill="#8fa3c2">📻 ${ar?'موجه الراديو':'Radio Ch.'}: ${esc(h.radioChannel)}</text>` : '';
+    const doneText = h.done ? `<text x="${cellCx}" y="${topY+54}" text-anchor="middle" font-size="13.5" font-weight="800" fill="#34d399">${ar?'تم الانتهاء من العنبر':'Hold Completed'}</text>` : '';
 
     holdBodies.push(`
       <rect x="${cellX0}" y="${topY}" width="${holdW}" height="${bottomY-topY}" fill="${fill}" stroke="${h.done?'#1f8f5c':'#1e293b'}" stroke-width="1"/>
       <rect x="${cellX0+7}" y="${topY+7}" width="${holdW-14}" height="${(bottomY-topY)-14}" fill="none" stroke="#33415580" stroke-width="1" stroke-dasharray="3 4"/>
       ${cargoPile}
-      <text x="${cellCx}" y="${topY+22}" text-anchor="middle" font-size="13" font-weight="700" fill="#e2e8f0">HOLD ${h.index}</text>
+      <text x="${cellCx}" y="${topY+22}" text-anchor="middle" font-size="17" font-weight="700" fill="#e2e8f0">HOLD ${h.index}</text>
       ${radioText}
       ${doneText}
       ${loaderIcon}
@@ -3562,7 +3600,7 @@ function buildVesselSVG(plan){
 
     <rect x="0" y="0" width="${totalW}" height="${totalH}" fill="#0b1220"/>
     <rect x="16" y="8" width="${totalW-32}" height="34" rx="8" fill="#111a2c" stroke="#22314a" stroke-width="1"/>
-    <text x="${totalW/2}" y="30" text-anchor="middle" font-size="18" font-weight="800" fill="#e8b93f">${esc(plan.name)} — ${esc(plan.date||todayStr())}</text>
+    <text x="${totalW/2}" y="30" text-anchor="middle" font-size="23" font-weight="800" fill="#e8b93f">${esc(plan.name)} — ${esc(plan.date||todayStr())}</text>
 
     <g filter="url(#shadow-${plan.id})">
       <path d="${hullPath}" fill="url(#hullGrad-${plan.id})"/>
@@ -3598,6 +3636,64 @@ function buildVesselSVG(plan){
 
     ${craneLayer.join('')}
   </svg>`;
+}
+
+/* The hold-plan ship diagram is pure SVG (vector), so instead of letting
+   html2canvas re-screenshot the DOM (which caps out at the on-screen size),
+   we rasterize the SVG markup directly at a very large target resolution.
+   This keeps every label crisp even when the exported image is zoomed in. */
+function captureHoldPlanCanvas(plan, bgOverride){
+  return new Promise((resolve, reject)=>{
+    const svgStr = buildVesselSVG(plan);
+    const vbMatch = svgStr.match(/viewBox="0 0 ([\d.]+) ([\d.]+)"/);
+    const vw = vbMatch ? parseFloat(vbMatch[1]) : 1600;
+    const vh = vbMatch ? parseFloat(vbMatch[2]) : 700;
+    const outW = Math.round(Math.max(vw*3, 3600));
+    const outH = Math.round(vh * (outW/vw));
+    const svgSized = svgStr.replace(/width="100%" style="max-width:[^"]*;"/, `width="${outW}" height="${outH}"`);
+    const svg64 = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svgSized);
+    const img = new Image();
+    img.onload = ()=>{
+      const canvas = document.createElement('canvas');
+      canvas.width = outW; canvas.height = outH;
+      const ctx = canvas.getContext('2d');
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
+      ctx.drawImage(img, 0, 0, outW, outH);
+      composeWithLogo(canvas, bgOverride).then(resolve);
+    };
+    img.onerror = reject;
+    img.src = svg64;
+  });
+}
+function shareHoldPlanImage(planId, filename){
+  const p = state.holdPlans.find(x=>x.id===planId);
+  if(!p) return;
+  captureHoldPlanCanvas(p, '#0b1220').then(finalCanvas=>{
+    finalCanvas.toBlob(blob=>{
+      if(!blob){ alert('تعذر توليد الصورة'); return; }
+      const file = new File([blob], filename, {type:'image/png'});
+      if(navigator.canShare && navigator.canShare({files:[file]})){
+        navigator.share({files:[file], title:'Hold Plan', text:'مخطط العنابر'}).catch(err=>{
+          if(err.name !== 'AbortError') downloadCanvas(finalCanvas, filename);
+        });
+      } else { downloadCanvas(finalCanvas, filename); }
+    }, 'image/png', 1.0);
+  }).catch(err=>{ console.error(err); alert('حدث خطأ أثناء تصدير الصورة'); });
+}
+function shareHoldPlanPDF(planId, filename){
+  const p = state.holdPlans.find(x=>x.id===planId);
+  if(!p) return;
+  if(typeof window.jspdf==='undefined'){ alert(currentLang()==='ar'?'تعذر تحميل مكتبة PDF — تأكد من الاتصال بالإنترنت':'PDF library failed to load — check your internet connection'); return; }
+  captureHoldPlanCanvas(p, '#0b1220').then(finalCanvas=>{
+    const { jsPDF } = window.jspdf;
+    const landscape = finalCanvas.width >= finalCanvas.height;
+    const pageW = landscape ? 297 : 210;
+    const pageH = finalCanvas.height * (pageW/finalCanvas.width);
+    const pdf = new jsPDF({ orientation: landscape?'landscape':'portrait', unit:'mm', format:[pageW, pageH] });
+    pdf.addImage(finalCanvas.toDataURL('image/png'), 'PNG', 0, 0, pageW, pageH, undefined, 'FAST');
+    pdf.save(filename);
+  }).catch(err=>{ console.error(err); alert('حدث خطأ أثناء تصدير PDF'); });
 }
 
 function buildYardPrintHTML(){
@@ -3646,6 +3742,43 @@ function findHoldPlanByVesselName(name){
   const matches = (state.holdPlans||[]).filter(p=>String(p.name).trim().toLowerCase()===n);
   return matches.length ? matches[matches.length-1] : null; // most recently added plan for that vessel name
 }
+
+/* ===================== CROSS-MODULE DATA LINKING =====================
+   Cranes are shared across the Roster/team-assignment screen and the Hold
+   Plan screen. Whichever one you enter data in, the other updates itself —
+   so you only ever type a crane→hold assignment once. Matching is done by
+   vessel NAME (the one shared key both screens already use). */
+
+/* Roster (تقسيمة الوناشين) → Hold Plan: assigning/moving a crane to a hold
+   number in the daily roster pushes that same crane number onto the
+   matching hold in that vessel's hold plan, if one exists. */
+function syncHoldPlanFromRoster(vesselName, craneNumber, holdIndex){
+  if(!craneNumber || !holdIndex || holdIndex==='-') return;
+  const plan = findHoldPlanByVesselName(vesselName);
+  if(!plan) return;
+  const hold = plan.holds.find(h=>String(h.index)===String(holdIndex));
+  if(!hold || hold.craneNumber===craneNumber) return;
+  hold.craneNumber = craneNumber;
+  log('مخطط عنابر','تحديث تلقائي من تقسيمة الوناشين',null,{vessel:vesselName, hold:holdIndex, crane:craneNumber});
+}
+
+/* Hold Plan (مخطط العنابر) → Roster: assigning a crane to a hold there
+   updates that same crane's "hold" field wherever it's already assigned to
+   this vessel in today's roster — so the roster table reflects it without
+   re-typing it there too. */
+function syncRosterFromHoldPlan(vesselName, craneNumber, holdIndex){
+  if(!craneNumber) return;
+  const date = currentRosterDate();
+  const roster = state.rosterDates && state.rosterDates[date];
+  if(!roster) return;
+  const rv = roster.vessels.find(v=>String(v.name).trim().toLowerCase()===String(vesselName).trim().toLowerCase());
+  if(!rv) return;
+  const cr = (rv.cranes||[]).find(c=>String(c.craneNumber)===String(craneNumber));
+  if(!cr || String(cr.hold)===String(holdIndex)) return;
+  cr.hold = holdIndex || '-';
+  log('روستر','تحديث تلقائي من مخطط العنابر',null,{vessel:vesselName, crane:craneNumber, hold:holdIndex});
+}
+
 function currentKPIVesselName(){
   if(kpiDraft.vesselName && kpiDraft.vesselName.trim()) return kpiDraft.vesselName.trim();
   if(kpiDraft.vesselId){ const v = state.vessels.find(x=>x.id===kpiDraft.vesselId); if(v) return v.name; }
@@ -4649,8 +4782,8 @@ function shareElementAsPDF(elementId, filename, bgOverride){
     const pageW = landscape ? 297 : 210; // A4 width in mm, oriented to match the content
     const pageH = finalCanvas.height * (pageW/finalCanvas.width);
     const pdf = new jsPDF({ orientation: landscape?'landscape':'portrait', unit:'mm', format:[pageW, pageH] });
-    const imgData = finalCanvas.toDataURL('image/jpeg', 0.97);
-    pdf.addImage(imgData, 'JPEG', 0, 0, pageW, pageH, undefined, 'FAST');
+    const imgData = finalCanvas.toDataURL('image/png'); // lossless — quality over file size
+    pdf.addImage(imgData, 'PNG', 0, 0, pageW, pageH, undefined, 'FAST');
     pdf.save(filename);
   }).catch(err=>{ console.error(err); alert('حدث خطأ أثناء تصدير PDF'); });
 }
@@ -4676,7 +4809,7 @@ function captureElementCanvas(elementId, bgOverride){
   return new Promise((resolve, reject)=>{
     requestAnimationFrame(()=>{
       html2canvas(el, {
-        scale: 4,               // very high resolution export (print-grade)
+        scale: 6,               // very high resolution export (print-grade)
         useCORS: true,
         backgroundColor: bgOverride || null,
         windowWidth: Math.max(window.innerWidth, Math.ceil(naturalWidth) + 80),
@@ -4708,43 +4841,48 @@ function composeWithLogo(sourceCanvas, bgOverride){
   return new Promise((resolve)=>{
     function draw(logo){
       const isDark = !!bgOverride && bgOverride.toLowerCase()!=='#ffffff';
-      const bandH = Math.max(130, Math.min(220, Math.round(sourceCanvas.width*0.06)));
+      const topBandH = Math.max(120, Math.min(200, Math.round(sourceCanvas.width*0.055)));
+      const botBandH = Math.max(70, Math.min(110, Math.round(sourceCanvas.width*0.03)));
       const out = document.createElement('canvas');
       out.width = sourceCanvas.width;
-      out.height = sourceCanvas.height + bandH;
+      out.height = topBandH + sourceCanvas.height + botBandH;
       const ctx = out.getContext('2d');
-      ctx.fillStyle = isDark ? (bgOverride||'#0b1220') : '#ffffff';
-      ctx.fillRect(0,0,out.width,out.height);
-      ctx.fillStyle = '#e8b93f';
-      ctx.fillRect(0, bandH-4, out.width, 4);
-      const pad = bandH*0.16;
+      const bandBg = isDark ? (bgOverride||'#0b1220') : '#ffffff';
       const ar = currentLang && currentLang()==='ar';
 
-      // Logo column: logo image, with the date/time directly underneath it —
-      // kept together as one block, separate from the brand name/tagline.
-      const logoH = bandH*0.46;
+      // --- Top band: logo + tagline underneath it (no "AF Logic" wordmark text) ---
+      ctx.fillStyle = bandBg;
+      ctx.fillRect(0,0,out.width,topBandH);
+      ctx.fillStyle = '#e8b93f';
+      ctx.fillRect(0, topBandH-4, out.width, 4);
+      const pad = topBandH*0.16;
+      const logoH = topBandH*0.5;
       const logoW = logo ? logoH * (logo.width/logo.height) : logoH;
-      const logoColX = ar ? out.width - pad - logoW : pad;
-      const logoY = bandH*0.10;
-      if(logo) ctx.drawImage(logo, logoColX, logoY, logoW, logoH);
+      const logoX = ar ? out.width - pad - logoW : pad;
+      const logoY = topBandH*0.14;
+      if(logo) ctx.drawImage(logo, logoX, logoY, logoW, logoH);
       ctx.textAlign = 'center';
       ctx.textBaseline = 'top';
       ctx.fillStyle = isDark ? '#9aa4b5' : '#5a5a5a';
-      ctx.font = `400 ${Math.round(bandH*0.14)}px Arial, sans-serif`;
-      ctx.fillText(new Date().toLocaleString('en-GB'), logoColX + logoW/2, logoY + logoH + bandH*0.08);
+      ctx.font = `600 ${Math.round(topBandH*0.13)}px Arial, sans-serif`;
+      ctx.fillText('Simply Better Logic', logoX + logoW/2, logoY + logoH + topBandH*0.08);
 
-      // Brand name block, on the opposite side from the logo column.
-      const textX = ar ? out.width - pad - logoW - pad*0.8 : pad + logoW + pad*0.8;
+      // --- Captured content ---
+      ctx.drawImage(sourceCanvas, 0, topBandH);
+
+      // --- Bottom band: date & time, to one side, well clear of the content above ---
+      const botY = topBandH + sourceCanvas.height;
+      ctx.fillStyle = bandBg;
+      ctx.fillRect(0, botY, out.width, botBandH);
+      ctx.fillStyle = '#e8b93f';
+      ctx.fillRect(0, botY, out.width, 3);
       ctx.textBaseline = 'middle';
       ctx.textAlign = ar ? 'right' : 'left';
-      ctx.fillStyle = isDark ? '#f1f5f9' : '#141406';
-      ctx.font = `700 ${Math.round(bandH*0.22)}px Arial, sans-serif`;
-      ctx.fillText('AF Logic', textX, bandH*0.42);
       ctx.fillStyle = isDark ? '#9aa4b5' : '#5a5a5a';
-      ctx.font = `400 ${Math.round(bandH*0.13)}px Arial, sans-serif`;
-      ctx.fillText('Simply Better Logic', textX, bandH*0.68);
+      ctx.font = `500 ${Math.round(botBandH*0.30)}px Arial, sans-serif`;
+      const dateX = ar ? out.width - pad : pad;
+      ctx.fillText(new Date().toLocaleString('en-GB'), dateX, botY + botBandH/2);
 
-      ctx.drawImage(sourceCanvas, 0, bandH);
       resolve(out);
     }
     if(_logoImgCache){ draw(_logoImgCache); return; }
