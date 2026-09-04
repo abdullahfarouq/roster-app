@@ -11,6 +11,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <style>
 :root {
   /* الألوان الأساسية للخلفيات */
@@ -956,6 +957,7 @@ function render(){
         ${!isHome?`<button class="btn-nav btn-back" onclick="goBack()">◀ ${ar?'رجوع':'Back'}</button>`:''}
         ${!isHome?`<button class="btn-nav btn-home" onclick="switchTab('home')">🏠 ${t('home')}</button>`:''}
         ${!isHome?`<button class="btn-ghost btn-sm" onclick="shareCurrent()">📤 ${t('share')}</button>`:''}
+        ${!isHome?`<button class="btn-ghost btn-sm" onclick="shareCurrentPDF()">📄 PDF</button>`:''}
       </div>
     </div>
     <div id="tabContent"></div>
@@ -3218,7 +3220,7 @@ function addHoldPlanEntry(){
   if(pick){ name = state.vessels.find(v=>v.id===pick).name; }
   else if(manual){ name = manual; }
   else { alert('اختر مركب أو اكتب اسمه'); return; }
-  const holds = Array.from({length:holdsCount}, (_,i)=>({index:i+1, craneNumber:'', loaderNumber:'', radioChannel:'', capacity:'', qty:'', done:false}));
+  const holds = Array.from({length:holdsCount}, (_,i)=>({index:i+1, craneNumber:'', loaderNumber:'', radioChannel:'', capacity:'', qty:'', done:false, nextHoldIndex:'', nextTime:'', nextQty:''}));
   state.holdPlans.push({id:uid(), name, holdsCount, opType, date:todayStr(), holds});
   log('مخطط عنابر','إضافة مركب',null,{name,holdsCount,opType});
   saveState(); renderTab();
@@ -3254,7 +3256,7 @@ function updateHoldPlanCount(planId, newCount){
   const newHolds = [];
   for(let i=1;i<=newCount;i++){
     const existing = oldHolds.find(h=>h.index===i);
-    newHolds.push(existing || {index:i, craneNumber:'', loaderNumber:'', radioChannel:'', capacity:'', qty:'', done:false});
+    newHolds.push(existing || {index:i, craneNumber:'', loaderNumber:'', radioChannel:'', capacity:'', qty:'', done:false, nextHoldIndex:'', nextTime:'', nextQty:''});
   }
   p.holds = newHolds;
   p.holdsCount = newCount;
@@ -3324,6 +3326,7 @@ function renderHoldPlanEntries(){
         </h2>
         <div class="row">
           <button class="btn-ghost btn-sm" onclick="shareElement('holdPlanCapture-${p.id}','hold_plan_${esc(p.name)}_${todayStr()}.png','#0b1220')">📤 مشاركة الصورة</button>
+          <button class="btn-ghost btn-sm" onclick="shareElementAsPDF('holdPlanCapture-${p.id}','hold_plan_${esc(p.name)}_${todayStr()}.pdf','#0b1220')">📄 PDF</button>
           <button class="btn-danger btn-sm" onclick="removeHoldPlanEntry('${esc(p.id)}')">حذف</button>
         </div>
       </div>
@@ -3368,6 +3371,23 @@ function renderHoldPlanEntries(){
               <input type="checkbox" ${h.done?'checked':''} onchange="toggleHoldDone('${esc(p.id)}',${h.index})">
               <span>تم الانتهاء من العمل على هذا العنبر</span>
             </label>
+            ${h.craneNumber ? `
+            <div class="divider"></div>
+            <div class="muted" style="font-size:.85rem;margin-bottom:4px;">🔜 الخطوة القادمة للونش ${esc(h.craneNumber)} (اختياري)</div>
+            <div class="field"><label>هيروح عنبر رقم</label>
+              <select onchange="updateHoldField('${esc(p.id)}',${h.index},'nextHoldIndex',this.value)">
+                <option value="">-- لسه محدّدش --</option>
+                ${p.holds.filter(x=>x.index!==h.index).map(x=>`<option value="${x.index}" ${String(h.nextHoldIndex)===String(x.index)?'selected':''}>عنبر ${x.index}${x.done?' (تم الانتهاء)':''}</option>`).join('')}
+              </select>
+            </div>
+            <div class="g2" style="gap:8px;">
+              <div class="field"><label>الوقت المتوقع للانتقال</label>
+                <input type="time" value="${esc(h.nextTime||'')}" oninput="updateHoldField('${esc(p.id)}',${h.index},'nextTime',this.value)">
+              </div>
+              <div class="field"><label>الكمية المتوقعة عند الانتقال (طن)</label>
+                <input type="number" min="0" value="${esc(h.nextQty||'')}" placeholder="تقريبي" oninput="updateHoldField('${esc(p.id)}',${h.index},'nextQty',this.value)">
+              </div>
+            </div>` : ''}
           </div>
         `).join('')}
       </div>
@@ -3429,16 +3449,16 @@ function cargoPileSVG(cellX0, cellX1, topY, bottomY, ratio){
 function buildVesselSVG(plan){
   const ar = currentLang()==='ar';
   const N = plan.holdsCount;
-  const holdW = 130;
-  const superW = 155;
-  const bowLen = 105;
-  const topY = 200, bottomY = 400, midY = (topY+bottomY)/2;
+  const holdW = 175;
+  const superW = 195;
+  const bowLen = 130;
+  const topY = 240, bottomY = 480, midY = (topY+bottomY)/2;
   const hullX0 = superW;
   const hullX1 = hullX0 + N*holdW;
   const bowTipX = hullX1 + bowLen;
-  const totalW = bowTipX + 50;
-  const totalH = 480;
-  const wlY = bottomY + 18; // waterline
+  const totalW = bowTipX + 60;
+  const totalH = 580;
+  const wlY = bottomY + 22; // waterline
 
   // Smooth raked bow (bezier) + rounded stern quarter, instead of straight angles.
   const hullPath = `
@@ -4197,7 +4217,8 @@ function renderKPIExport(){
   </div>
   <div class="row" style="gap:10px;flex-wrap:wrap;">
     <button class="btn-gold" onclick="exportKPIExcel()">📊 ${ar?'تصدير Excel':'Export Excel'}</button>
-    <button class="btn-ghost" onclick="shareElement('kpiReportCapture','kpi_report_${todayStr()}.png','#ffffff')">🖼️ ${ar?'تصدير صورة / PDF':'Export image / PDF'}</button>
+    <button class="btn-ghost" onclick="shareElement('kpiReportCapture','kpi_report_${todayStr()}.png','#ffffff')">🖼️ ${ar?'تصدير صورة':'Export image'}</button>
+    <button class="btn-ghost" onclick="shareElementAsPDF('kpiReportCapture','kpi_report_${todayStr()}.pdf','#ffffff')">📄 ${ar?'تصدير PDF':'Export PDF'}</button>
   </div>`;
 }
 /* SheetJS's free build can't embed a raster logo image inside a worksheet, so as
@@ -4206,11 +4227,20 @@ function renderKPIExport(){
 function sheetWithBrandHeader(rows, ar){
   const ws = XLSX.utils.json_to_sheet(rows, {origin:'A3'});
   XLSX.utils.sheet_add_aoa(ws, [
-    [ar?'AF Logic — جناح عمليات الموانئ والورديات':'AF Logic — Port Operations & Roster Suite'],
+    ['AF Logic — Simply Better Logic'],
     [`${ar?'تاريخ التصدير':'Exported'}: ${new Date().toLocaleString('en-GB')}`]
   ], {origin:'A1'});
   const colCount = rows.length ? Object.keys(rows[0]).length : 1;
   ws['!merges'] = [{s:{r:0,c:0}, e:{r:0,c:Math.max(0,colCount-1)}}, {s:{r:1,c:0}, e:{r:1,c:Math.max(0,colCount-1)}}];
+  // Auto-size columns for a clean, professional look instead of Excel's cramped default width.
+  if(rows.length){
+    const keys = Object.keys(rows[0]);
+    ws['!cols'] = keys.map(k=>{
+      const maxLen = Math.max(k.length, ...rows.map(r=> r[k]==null?0:String(r[k]).length));
+      return { wch: Math.min(42, Math.max(10, maxLen+2)) };
+    });
+  }
+  ws['!rows'] = [{hpt:20},{hpt:16}];
   return ws;
 }
 function exportKPIExcel(){
@@ -4591,8 +4621,45 @@ function clearLocalData(){
 
 /* ===================== EXPORT SHARE AS IMAGE ===================== */
 function shareElement(elementId, filename, bgOverride){
+  captureElementCanvas(elementId, bgOverride).then(finalCanvas=>{
+    if(!finalCanvas) return;
+    finalCanvas.toBlob(blob=>{
+      if(!blob){ alert('تعذر توليد الصورة'); return; }
+      const file = new File([blob], filename, {type:'image/png'});
+      if(navigator.canShare && navigator.canShare({files:[file]})){
+        navigator.share({files:[file], title:'Roster Report', text:'مشاركة تقرير الروستر'}).catch(err=>{
+          if(err.name !== 'AbortError') downloadCanvas(finalCanvas, filename);
+        });
+      } else {
+        downloadCanvas(finalCanvas, filename);
+      }
+    }, 'image/png', 1.0);
+  }).catch(err=>{ console.error(err); alert('حدث خطأ أثناء تصدير الصورة'); });
+}
+
+/* Exports the same high-resolution branded capture as a real, embedded PDF
+   (not just a renamed image) — one page, sized to the content, so printed or
+   viewed in any PDF reader it stays crisp at full resolution. */
+function shareElementAsPDF(elementId, filename, bgOverride){
+  if(typeof window.jspdf==='undefined'){ alert(currentLang()==='ar'?'تعذر تحميل مكتبة PDF — تأكد من الاتصال بالإنترنت':'PDF library failed to load — check your internet connection'); return; }
+  captureElementCanvas(elementId, bgOverride).then(finalCanvas=>{
+    if(!finalCanvas) return;
+    const { jsPDF } = window.jspdf;
+    const landscape = finalCanvas.width >= finalCanvas.height;
+    const pageW = landscape ? 297 : 210; // A4 width in mm, oriented to match the content
+    const pageH = finalCanvas.height * (pageW/finalCanvas.width);
+    const pdf = new jsPDF({ orientation: landscape?'landscape':'portrait', unit:'mm', format:[pageW, pageH] });
+    const imgData = finalCanvas.toDataURL('image/jpeg', 0.97);
+    pdf.addImage(imgData, 'JPEG', 0, 0, pageW, pageH, undefined, 'FAST');
+    pdf.save(filename);
+  }).catch(err=>{ console.error(err); alert('حدث خطأ أثناء تصدير PDF'); });
+}
+
+/* Shared capture core used by both the PNG and PDF export paths — kept in one
+   place so image quality (resolution/scale) only needs tuning here. */
+function captureElementCanvas(elementId, bgOverride){
   const el = document.getElementById(elementId);
-  if(!el){ alert('عنصر التصدير غير موجود'); return; }
+  if(!el){ alert('عنصر التصدير غير موجود'); return Promise.resolve(null); }
 
   const originalBackground = el.style.background;
   const originalWidth = el.style.width;
@@ -4606,41 +4673,29 @@ function shareElement(elementId, filename, bgOverride){
   el.style.maxWidth = 'none';
   el.style.overflow = 'visible';
 
-  requestAnimationFrame(()=>{
-    html2canvas(el, {
-      scale: 2.4,
-      useCORS: true,
-      backgroundColor: bgOverride || null,
-      windowWidth: Math.max(window.innerWidth, Math.ceil(naturalWidth) + 80),
-      scrollX: 0,
-      scrollY: -window.scrollY,
-      logging: false
-    }).then(canvas=>{
-      el.style.background = originalBackground;
-      el.style.width = originalWidth;
-      el.style.maxWidth = originalMaxWidth;
-      el.style.overflow = originalOverflow;
-
-      composeWithLogo(canvas, bgOverride).then(finalCanvas=>{
-        finalCanvas.toBlob(blob=>{
-          if(!blob){ alert('تعذر توليد الصورة'); return; }
-          const file = new File([blob], filename, {type:'image/png'});
-          if(navigator.canShare && navigator.canShare({files:[file]})){
-            navigator.share({files:[file], title:'Roster Report', text:'مشاركة تقرير الروستر'}).catch(err=>{
-              if(err.name !== 'AbortError') downloadCanvas(finalCanvas, filename);
-            });
-          } else {
-            downloadCanvas(finalCanvas, filename);
-          }
-        });
+  return new Promise((resolve, reject)=>{
+    requestAnimationFrame(()=>{
+      html2canvas(el, {
+        scale: 4,               // very high resolution export (print-grade)
+        useCORS: true,
+        backgroundColor: bgOverride || null,
+        windowWidth: Math.max(window.innerWidth, Math.ceil(naturalWidth) + 80),
+        scrollX: 0,
+        scrollY: -window.scrollY,
+        logging: false
+      }).then(canvas=>{
+        el.style.background = originalBackground;
+        el.style.width = originalWidth;
+        el.style.maxWidth = originalMaxWidth;
+        el.style.overflow = originalOverflow;
+        composeWithLogo(canvas, bgOverride).then(resolve);
+      }).catch(err=>{
+        el.style.background = originalBackground;
+        el.style.width = originalWidth;
+        el.style.maxWidth = originalMaxWidth;
+        el.style.overflow = originalOverflow;
+        reject(err);
       });
-    }).catch(err=>{
-      el.style.background = originalBackground;
-      el.style.width = originalWidth;
-      el.style.maxWidth = originalMaxWidth;
-      el.style.overflow = originalOverflow;
-      console.error(err);
-      alert('حدث خطأ أثناء تصدير الصورة');
     });
   });
 }
@@ -4653,7 +4708,7 @@ function composeWithLogo(sourceCanvas, bgOverride){
   return new Promise((resolve)=>{
     function draw(logo){
       const isDark = !!bgOverride && bgOverride.toLowerCase()!=='#ffffff';
-      const bandH = Math.max(90, Math.min(170, Math.round(sourceCanvas.width*0.045)));
+      const bandH = Math.max(130, Math.min(220, Math.round(sourceCanvas.width*0.06)));
       const out = document.createElement('canvas');
       out.width = sourceCanvas.width;
       out.height = sourceCanvas.height + bandH;
@@ -4662,27 +4717,33 @@ function composeWithLogo(sourceCanvas, bgOverride){
       ctx.fillRect(0,0,out.width,out.height);
       ctx.fillStyle = '#e8b93f';
       ctx.fillRect(0, bandH-4, out.width, 4);
-      const pad = bandH*0.22;
-      let textX = pad;
-      if(logo){
-        const logoH = bandH*0.6;
-        const logoW = logoH * (logo.width/logo.height);
-        ctx.drawImage(logo, pad, (bandH-logoH)/2, logoW, logoH);
-        textX = pad + logoW + pad*0.7;
-      }
+      const pad = bandH*0.16;
       const ar = currentLang && currentLang()==='ar';
+
+      // Logo column: logo image, with the date/time directly underneath it —
+      // kept together as one block, separate from the brand name/tagline.
+      const logoH = bandH*0.46;
+      const logoW = logo ? logoH * (logo.width/logo.height) : logoH;
+      const logoColX = ar ? out.width - pad - logoW : pad;
+      const logoY = bandH*0.10;
+      if(logo) ctx.drawImage(logo, logoColX, logoY, logoW, logoH);
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'top';
+      ctx.fillStyle = isDark ? '#9aa4b5' : '#5a5a5a';
+      ctx.font = `400 ${Math.round(bandH*0.14)}px Arial, sans-serif`;
+      ctx.fillText(new Date().toLocaleString('en-GB'), logoColX + logoW/2, logoY + logoH + bandH*0.08);
+
+      // Brand name block, on the opposite side from the logo column.
+      const textX = ar ? out.width - pad - logoW - pad*0.8 : pad + logoW + pad*0.8;
       ctx.textBaseline = 'middle';
       ctx.textAlign = ar ? 'right' : 'left';
-      const anchorX = ar ? out.width - textX : textX;
       ctx.fillStyle = isDark ? '#f1f5f9' : '#141406';
-      ctx.font = `700 ${Math.round(bandH*0.24)}px Arial, sans-serif`;
-      ctx.fillText('AF Logic', anchorX, bandH*0.38);
+      ctx.font = `700 ${Math.round(bandH*0.22)}px Arial, sans-serif`;
+      ctx.fillText('AF Logic', textX, bandH*0.42);
       ctx.fillStyle = isDark ? '#9aa4b5' : '#5a5a5a';
-      ctx.font = `400 ${Math.round(bandH*0.145)}px Arial, sans-serif`;
-      ctx.fillText(ar ? 'Simply Better Logic — جناح عمليات الموانئ والورديات' : 'Simply Better Logic — Port Operations & Roster Suite', anchorX, bandH*0.68);
-      ctx.textAlign = ar ? 'left' : 'right';
-      ctx.font = `400 ${Math.round(bandH*0.16)}px Arial, sans-serif`;
-      ctx.fillText(new Date().toLocaleString('en-GB'), ar ? pad : out.width-pad, bandH*0.5);
+      ctx.font = `400 ${Math.round(bandH*0.13)}px Arial, sans-serif`;
+      ctx.fillText('Simply Better Logic', textX, bandH*0.68);
+
       ctx.drawImage(sourceCanvas, 0, bandH);
       resolve(out);
     }
@@ -4703,6 +4764,9 @@ function downloadCanvas(canvas, filename){
 }
 function shareCurrent(){
   shareElement('captureArea', `roster_report_${todayStr()}.png`, '#08080A');
+}
+function shareCurrentPDF(){
+  shareElementAsPDF('captureArea', `roster_report_${todayStr()}.pdf`, '#08080A');
 }
 
 /* ===================== AI ASSISTANT CHAT ===================== */
