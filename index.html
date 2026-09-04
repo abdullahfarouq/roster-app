@@ -9,6 +9,8 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <style>
 :root {
   /* الألوان الأساسية للخلفيات */
@@ -716,8 +718,118 @@ function saveState(){
     localStorage.setItem(keyFor(state.loginId), JSON.stringify(state));
     localStorage.setItem('roster_current_user_id', state.loginId);
     localStorage.setItem('roster_current_user_name', state.name);
+    pushStateToFirebase();
   }catch(e){ console.error('save failed', e); alert(currentLang()==='ar'?'تعذر حفظ البيانات محلياً — تأكد أن مساحة التخزين غير ممتلئة.':'Could not save data locally — please check your storage space.'); }
 }
+
+/* ===================== FIREBASE MULTI-USER LIVE SYNC =====================
+   Optional: off by default, works purely on localStorage (per-device, single
+   user) until the user pastes their own Firebase project config + a shared
+   "workspace code" in Settings. Once connected, every account that uses the
+   same workspace code sees the same data update live (create/edit/delete
+   anywhere reflects everywhere within ~1 second) — so anyone, even someone
+   on leave who opens the app later, sees exactly what happened. */
+let fbApp=null, fbDb=null, fbDocRef=null, fbUnsub=null;
+let fbLocalRev=0, fbLastPushedRev=0, fbPushTimer=null;
+let fbSyncStatus='offline'; // offline | connecting | connected | error | not_configured
+function fbCfgKey(){ return 'roster_firebase_cfg'; }
+function getFirebaseCfg(){
+  try{ return JSON.parse(localStorage.getItem(fbCfgKey())||'null'); }catch(e){ return null; }
+}
+function saveFirebaseCfg(cfg){ localStorage.setItem(fbCfgKey(), JSON.stringify(cfg)); }
+function clearFirebaseCfg(){
+  localStorage.removeItem(fbCfgKey());
+  if(fbUnsub){ try{ fbUnsub(); }catch(e){} }
+  fbApp=null; fbDb=null; fbDocRef=null; fbUnsub=null; fbSyncStatus='offline';
+}
+function updateSyncBadge(){
+  const b = document.getElementById('fbSyncBadge');
+  if(!b) return;
+  const ar = currentLang()==='ar';
+  const map = {
+    offline:      ['⚪', ar?'محلي فقط (بدون مزامنة)':'Local only (not synced)'],
+    not_configured:['⚪', ar?'محلي فقط (بدون مزامنة)':'Local only (not synced)'],
+    connecting:   ['🟡', ar?'جارِ الاتصال...':'Connecting...'],
+    connected:    ['🟢', ar?'متصل ومتزامن مع كل الحسابات':'Live — synced across all accounts'],
+    error:        ['🔴', ar?'خطأ في الاتصال بالمزامنة':'Sync connection error'],
+    sdk_missing:  ['🔴', ar?'تعذر تحميل مكتبة المزامنة (تأكد من الاتصال بالإنترنت)':'Sync library failed to load (check internet connection)']
+  };
+  const [dot,label] = map[fbSyncStatus]||map.offline;
+  b.innerHTML = `${dot} ${label}`;
+}
+function connectFirebase(){
+  const cfg = getFirebaseCfg();
+  if(!cfg || !cfg.apiKey || !cfg.projectId || !cfg.workspaceCode){ fbSyncStatus='not_configured'; updateSyncBadge(); return; }
+  try{
+    if(typeof firebase==='undefined'){ fbSyncStatus='sdk_missing'; updateSyncBadge(); return; }
+    if(!fbApp){
+      fbApp = firebase.apps && firebase.apps.length ? firebase.apps[0] : firebase.initializeApp({
+        apiKey:cfg.apiKey, authDomain:cfg.authDomain, projectId:cfg.projectId,
+        storageBucket:cfg.storageBucket, messagingSenderId:cfg.messagingSenderId, appId:cfg.appId
+      });
+    }
+    fbDb = firebase.firestore();
+    fbDocRef = fbDb.collection('roster_workspaces').doc(cfg.workspaceCode);
+    if(fbUnsub){ try{ fbUnsub(); }catch(e){} }
+    fbSyncStatus='connecting'; updateSyncBadge();
+    fbUnsub = fbDocRef.onSnapshot(snap=>{
+      if(!snap.exists){ fbSyncStatus='connected'; updateSyncBadge(); return; }
+      const remote = snap.data();
+      if(!remote || !remote.data) return;
+      if(remote.rev && remote.rev===fbLastPushedRev){
+        // this is just Firestore confirming the write we just made — ignore, avoid a self-triggered re-render loop
+        fbLocalRev = remote.rev; fbSyncStatus='connected'; updateSyncBadge(); return;
+      }
+      const keepLoginId = state ? state.loginId : null, keepName = state ? state.name : null;
+      state = remote.data;
+      if(keepLoginId) state.loginId = keepLoginId;
+      if(keepName) state.name = keepName;
+      ensureKPI(); ensureYardData();
+      if(!state.holdPlans) state.holdPlans = [];
+      fbLocalRev = remote.rev||fbLocalRev;
+      try{ localStorage.setItem(keyFor(state.loginId), JSON.stringify(state)); }catch(e){}
+      fbSyncStatus='connected'; updateSyncBadge();
+      renderTab();
+    }, err=>{ console.error('Firebase sync error', err); fbSyncStatus='error'; updateSyncBadge(); });
+  }catch(e){ console.error('Firebase connect failed', e); fbSyncStatus='error'; updateSyncBadge(); }
+}
+function pushStateToFirebase(){
+  if(!fbDocRef) return;
+  clearTimeout(fbPushTimer);
+  fbPushTimer = setTimeout(()=>{
+    fbLocalRev += 1;
+    fbLastPushedRev = fbLocalRev;
+    const payload = JSON.parse(JSON.stringify(state));
+    fbDocRef.set({ data: payload, rev: fbLocalRev, updatedAt: Date.now(), updatedBy: state.name||state.loginId||'?' })
+      .catch(e=>{ console.error('Firebase push failed', e); fbSyncStatus='error'; updateSyncBadge(); });
+  }, 700);
+}
+function saveFirebaseSettingsForm(){
+  const ar = currentLang()==='ar';
+  const cfg = {
+    apiKey: document.getElementById('fbApiKey').value.trim(),
+    authDomain: document.getElementById('fbAuthDomain').value.trim(),
+    projectId: document.getElementById('fbProjectId').value.trim(),
+    storageBucket: document.getElementById('fbStorageBucket').value.trim(),
+    messagingSenderId: document.getElementById('fbSenderId').value.trim(),
+    appId: document.getElementById('fbAppId').value.trim(),
+    workspaceCode: document.getElementById('fbWorkspaceCode').value.trim()
+  };
+  if(!cfg.apiKey || !cfg.projectId || !cfg.workspaceCode){
+    alert(ar?'من فضلك أدخل على الأقل: API Key وProject ID وكود المؤسسة':'Please enter at least: API Key, Project ID and workspace code');
+    return;
+  }
+  saveFirebaseCfg(cfg);
+  fbApp=null; fbDb=null; fbDocRef=null;
+  connectFirebase();
+  renderTab();
+}
+function disconnectFirebaseUI(){
+  const ar = currentLang()==='ar';
+  if(!confirm(ar?'قطع المزامنة السحابية عن هذا الجهاز؟ البيانات المحلية هتفضل موجودة.':'Disconnect cloud sync on this device? Local data stays intact.')) return;
+  clearFirebaseCfg(); renderTab();
+}
+
 function log(entity, action, before, after){
   if(!state.logs) state.logs = [];
   state.logs.unshift({id:uid(), ts:nowStr(), entity, action, before, after, user:state.name});
@@ -754,6 +866,7 @@ function tryLogin(){
   }
   document.documentElement.setAttribute('lang', state.lang);
   document.documentElement.setAttribute('dir', state.lang==='ar'?'rtl':'ltr');
+  connectFirebase();
   render();
 }
 
@@ -774,6 +887,7 @@ function checkAutoLogin(){
         ensureKPI(); ensureYardData();
         document.documentElement.setAttribute('lang', state.lang);
         document.documentElement.setAttribute('dir', state.lang==='ar'?'rtl':'ltr');
+        connectFirebase();
       }
     }
   }catch(e){ console.error('auto login failed', e); }
@@ -869,6 +983,7 @@ function renderTab(){
   applyDynamicTableSizing();
   if(currentTab==='kpi') renderKPICharts();
   if(currentTab==='yardmgmt') renderYardChart();
+  if(currentTab==='settings') updateSyncBadge();
 }
 
 /* =========================================================
@@ -3293,11 +3408,24 @@ const CARGO_TYPES = [
   {id:'roro',          ar:'رورو',       en:'RoRo'}
 ];
 let kpiSubTab = 'log';
-let kpiDraft = { craneEntries: [], delays: [] };
+let kpiDraft = { vesselId:'', vesselName:'', yardId:'', craneEntries: [], delays: [] };
 let kpiReportPeriod = '24h';
 let kpiChartInstances = {};
 
 function switchKPISubTab(id){ kpiSubTab = id; renderTab(); }
+function findHoldPlanByVesselName(name){
+  if(!name) return null;
+  const n = String(name).trim().toLowerCase();
+  if(!n) return null;
+  const matches = (state.holdPlans||[]).filter(p=>String(p.name).trim().toLowerCase()===n);
+  return matches.length ? matches[matches.length-1] : null; // most recently added plan for that vessel name
+}
+function currentKPIVesselName(){
+  if(kpiDraft.vesselName && kpiDraft.vesselName.trim()) return kpiDraft.vesselName.trim();
+  if(kpiDraft.vesselId){ const v = state.vessels.find(x=>x.id===kpiDraft.vesselId); if(v) return v.name; }
+  return '';
+}
+function setKPIVessel(field, val){ kpiDraft[field] = val; renderTab(); }
 
 function viewKPI(){
   ensureKPI(); ensureYardData();
@@ -3328,17 +3456,20 @@ function renderKPILogForm(){
   const ar = currentLang()==='ar';
   const cranes = state.crew.cranes || [];
   const operators = state.crew.operators || [];
+  const yards = (state.yardData && state.yardData.yards) || [];
+  const vesselName = currentKPIVesselName();
+  const linkedPlan = findHoldPlanByVesselName(vesselName);
   return `
   <div class="card" style="margin-bottom:16px;">
     <h2>🚢 ${ar?'بيانات المركب والحمولة':'Vessel & Cargo Data'}</h2>
     <div class="g2">
       <div class="field"><label>${ar?'المركب':'Vessel'}</label>
-        <select id="kpiVessel">
+        <select id="kpiVessel" onchange="setKPIVessel('vesselId', this.value)">
           <option value="">${ar?'اختر مركب مسجل (اختياري)':'Pick a registered vessel (optional)'}</option>
-          ${state.vessels.map(v=>`<option value="${esc(v.id)}">${esc(v.name)}</option>`).join('')}
+          ${state.vessels.map(v=>`<option value="${esc(v.id)}" ${kpiDraft.vesselId===v.id?'selected':''}>${esc(v.name)}</option>`).join('')}
         </select>
       </div>
-      <div class="field"><label>${ar?'اسم المركب (لو غير مسجل)':'Vessel name (if not listed)'}</label><input id="kpiVesselName" placeholder="${ar?'اسم المركب':'Vessel name'}"></div>
+      <div class="field"><label>${ar?'اسم المركب (لو غير مسجل)':'Vessel name (if not listed)'}</label><input id="kpiVesselName" value="${esc(kpiDraft.vesselName||'')}" oninput="setKPIVessel('vesselName', this.value)" placeholder="${ar?'اسم المركب':'Vessel name'}"></div>
       <div class="field"><label>${ar?'التاريخ':'Date'}</label><input id="kpiDate" type="date" value="${todayStr()}"></div>
       <div class="field"><label>${ar?'الوردية':'Shift'}</label><input id="kpiShift" value="${esc(state.shiftName||'')}"></div>
       <div class="field"><label>${ar?'عدد العنابر':'Number of holds'}</label><input id="kpiHolds" type="number" min="1" placeholder="4"></div>
@@ -3355,7 +3486,15 @@ function renderKPILogForm(){
         </select>
       </div>
       <div class="field"><label>${ar?'سرعة الرياح (كم/س)':'Wind speed (km/h)'}</label><input id="kpiWind" type="number" min="0" placeholder="0"></div>
+      <div class="field"><label>${ar?'إضافة/خصم من يارد (اختياري)':'Add/deduct from a yard (optional)'}</label>
+        <select id="kpiYard" onchange="setKPIVessel('yardId', this.value)">
+          <option value="">${ar?'بدون ربط بيارد':'No yard link'}</option>
+          ${yards.map(y=>`<option value="${esc(y.id)}" ${kpiDraft.yardId===y.id?'selected':''}>${esc(y.name)}</option>`).join('')}
+        </select>
+      </div>
     </div>
+    ${linkedPlan ? `<div class="notice">🔗 ${ar?`متصل بمخطط عنابر "${esc(vesselName)}" — أي ونش تحدد له عنبر هيتحدّث في المخطط تلقائيًا عند الحفظ.`:`Linked to "${esc(vesselName)}"'s hold plan — assigning a crane to a hold here updates the hold plan automatically on save.`}</div>` :
+      (vesselName ? `<div class="notice">ℹ️ ${ar?'لا يوجد مخطط عنابر بنفس اسم المركب — أنشئه من تبويب "مخطط العنابر" لو عايز الربط التلقائي بالعنابر.':'No hold plan matches this vessel name yet — create one from "Hold Plan" tab to enable automatic hold linking.'}</div>` : '')}
   </div>
 
   <div class="card" style="margin-bottom:16px;">
@@ -3379,6 +3518,13 @@ function renderKPILogForm(){
               ${operators.map(o=>`<option value="${esc(o.id)}" ${e.operatorId===o.id?'selected':''}>${esc(o.name)}</option>`).join('')}
             </select>
           </div>
+          ${linkedPlan ? `
+          <div class="field"><label>${ar?'شغال في عنبر رقم':'Working in hold #'}</label>
+            <select onchange="updateKPICraneRow(${i},'holdIndex',this.value)">
+              <option value="">${ar?'بدون ربط':'Not linked'}</option>
+              ${linkedPlan.holds.map(h=>`<option value="${h.index}" ${String(e.holdIndex)===String(h.index)?'selected':''}>${ar?'عنبر':'Hold'} ${h.index}${h.craneNumber?(' — 🏗️ '+esc(h.craneNumber)):''}${h.done?(' ✅':'')}</option>`).join('')}
+            </select>
+          </div>` : ''}
           <div class="field"><label>${ar?'عدد الساعات (بمضاعفات نصف ساعة)':'Hours worked (in 30-min steps)'}</label>
             <div class="stepper">
               <button type="button" class="stepper-btn" onclick="bumpKPICraneHours(${i},-0.5)">−</button>
@@ -4108,6 +4254,7 @@ function bindReportsSearch(){
 function viewSettings(){
   const l = currentLang();
   const ar = l==='ar';
+  const cfg = getFirebaseCfg() || {};
   return `
   <div id="captureArea">
   <h1>${ar?'الإعدادات والنسخ الاحتياطي':'Settings & Backup'}</h1>
@@ -4127,6 +4274,28 @@ function viewSettings(){
         <input id="apiKeyInput" type="password" value="${esc(state.geminiApiKey||'')}" placeholder="AIzaSy...">
       </div>
       <button class="btn-gold" onclick="saveApiKey()">${ar?'حفظ المفتاح':'Save Key'}</button>
+    </div>
+
+    <div class="card" style="grid-column:1/-1;">
+      <h3>🔥 ${ar?'المزامنة السحابية بين أكتر من حساب (Firebase)':'Multi-account live sync (Firebase)'}</h3>
+      <p class="muted">${ar?'اربط البرنامج بمشروع Firebase الخاص بيك (Firestore). كل حساب يستخدم نفس "كود المؤسسة" هيشوف نفس البيانات لحظيًا — أي دخول بيانات من أي جهاز يظهر عند الجميع فورًا، حتى لو كان حد إجازة وفتح البرنامج بعدين.':'Connect the app to your own Firebase project (Firestore). Every account using the same "workspace code" sees the same data live — any entry from any device shows up for everyone instantly, even for someone opening the app later after being off.'}</p>
+      <div id="fbSyncBadge" class="notice" style="margin-bottom:12px;"></div>
+      <div class="g2">
+        <div class="field"><label>API Key</label><input id="fbApiKey" value="${esc(cfg.apiKey||'')}" placeholder="AIza..."></div>
+        <div class="field"><label>Project ID</label><input id="fbProjectId" value="${esc(cfg.projectId||'')}" placeholder="my-project-id"></div>
+        <div class="field"><label>Auth Domain</label><input id="fbAuthDomain" value="${esc(cfg.authDomain||'')}" placeholder="my-project-id.firebaseapp.com"></div>
+        <div class="field"><label>Storage Bucket</label><input id="fbStorageBucket" value="${esc(cfg.storageBucket||'')}" placeholder="my-project-id.appspot.com"></div>
+        <div class="field"><label>Messaging Sender ID</label><input id="fbSenderId" value="${esc(cfg.messagingSenderId||'')}" placeholder="1234567890"></div>
+        <div class="field"><label>App ID</label><input id="fbAppId" value="${esc(cfg.appId||'')}" placeholder="1:1234567890:web:abcdef"></div>
+        <div class="field" style="grid-column:1/-1;"><label>${ar?'كود المؤسسة / الفريق (نفس الكود لكل الحسابات المرتبطة)':'Workspace / company code (same code for every linked account)'}</label>
+          <input id="fbWorkspaceCode" value="${esc(cfg.workspaceCode||'')}" placeholder="${ar?'مثال: aflogic-port-ops':'e.g. aflogic-port-ops'}">
+        </div>
+      </div>
+      <div class="row" style="margin-top:10px;">
+        <button class="btn-gold" onclick="saveFirebaseSettingsForm()">🔌 ${ar?'حفظ واتصال':'Save & Connect'}</button>
+        <button class="btn-danger btn-sm" onclick="disconnectFirebaseUI()">🔌 ${ar?'قطع المزامنة':'Disconnect'}</button>
+      </div>
+      <p class="muted" style="margin-top:10px;">${ar?'ملاحظة: القيم دي بتتخزن في هذا الجهاز/المتصفح بس، ومحتاج تدخلها بنفس القيم على كل جهاز/حساب عايز يشترك في نفس المزامنة.':'Note: these values are stored on this device/browser only — enter the same values on every device/account you want sharing the same live sync.'}</p>
     </div>
 
     <div class="card">
