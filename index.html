@@ -151,6 +151,13 @@ table{width:100%;border-collapse:collapse;font-size:.85rem;}
 th,td{padding:9px 10px;text-align:right;border-bottom:1px solid var(--border);word-wrap:break-word;overflow-wrap:break-word;}
 th{color:var(--gold);font-weight:700;}
 .crane-block{border:1px solid var(--border);border-radius:16px;padding:14px;margin-top:12px;background:rgba(255,255,255,0.03);}
+.stepper{display:flex;align-items:center;gap:10px;background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:12px;padding:6px 10px;}
+.stepper-btn{width:34px;height:34px;border-radius:10px;background:rgba(255,255,255,.08);color:var(--cream);font-size:1.15rem;font-weight:800;line-height:1;padding:0;}
+.stepper-btn:hover{background:var(--gold);color:#141406;}
+.stepper-val{flex:1;text-align:center;font-weight:800;color:var(--gold);font-size:.92rem;}
+.stepper-presets{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px;}
+.chip-btn{padding:5px 11px;border-radius:100px;background:rgba(255,255,255,.05);border:1px solid var(--border);color:#d8d8de;font-size:.74rem;font-weight:700;}
+.chip-btn:hover{background:var(--gold);color:#141406;border-color:transparent;}
 .chip{display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,0.06);border:1px solid var(--border);border-radius:100px;padding:5px 12px;font-size:.78rem;margin:3px;}
 .chip button{background:none;border:none;color:var(--danger);padding:0;font-size:.8rem;cursor:pointer;}
 .empty{text-align:center;padding:30px;color:#8b8b93;}
@@ -643,7 +650,7 @@ const I18N = {
     home:'Home', share:'Share as image',
     tab_crew:'Operations & Equipment', tab_pier:'Berth Plan', tab_roster:'Shift Schedule',
     tab_calendar:'Rotation Table', tab_leaves:'Leaves', tab_handover:'Handover', tab_settings:'Settings',
-    tab_holdplan:'Hold Plan', tab_kpi:'Performance & KPIs', tab_reports:'Activity Log',
+    tab_holdplan:'Hold Plan', tab_kpi:'Performance & KPIs', tab_reports:'Activity Log', tab_yardmgmt:'Yard',
     login_title:'Sign in to save & sync your data', login_name:'Name', login_phone:'Phone (optional)',
     login_email:'Email (optional)', login_btn:'Sign in', login_hint:'Use the same name/phone from any device to retrieve your saved data.'
   },
@@ -651,7 +658,7 @@ const I18N = {
     home:'الرئيسية', share:'مشاركة كصورة',
     tab_crew:'التشغيل والمعدات', tab_pier:'خطة الأرصفة', tab_roster:'جدول الوردية',
     tab_calendar:'جدول المناوبات', tab_leaves:'الإجازات', tab_handover:'التسليم والتسلم', tab_settings:'الإعدادات',
-    tab_holdplan:'مخطط العنابر', tab_kpi:'الأداء والـ KPIs', tab_reports:'سجل العمليات',
+    tab_holdplan:'مخطط العنابر', tab_kpi:'الأداء والـ KPIs', tab_reports:'سجل العمليات', tab_yardmgmt:'اليارد',
     login_title:'سجّل الدخول لحفظ ومزامنة بياناتك', login_name:'الاسم', login_phone:'رقم التليفون (اختياري)',
     login_email:'البريد الإلكتروني (اختياري)', login_btn:'دخول', login_hint:'استخدم نفس الاسم أو رقم التليفون من أي جهاز لاسترجاع بياناتك المحفوظة.'
   }
@@ -697,6 +704,11 @@ function ensureKPI(){
   if(!state.kpi.incidents) state.kpi.incidents = [];
   if(!state.kpi.breakdowns) state.kpi.breakdowns = [];
 }
+function ensureYardData(){
+  if(!state.yardData) state.yardData = {yards:[], transactions:[]};
+  if(!state.yardData.yards) state.yardData.yards = [];
+  if(!state.yardData.transactions) state.yardData.transactions = [];
+}
 
 function saveState(){
   try{
@@ -731,7 +743,7 @@ function tryLogin(){
       if(!state.holdPlans) state.holdPlans = [];
       if(!state.yard) state.yard = {name:'', notes:''};
       if(!state.lang) state.lang = localStorage.getItem('roster_lang') || 'en';
-      ensureKPI();
+      ensureKPI(); ensureYardData();
     } else {
       state = blankState(loginId, name, phone, email);
     }
@@ -759,7 +771,7 @@ function checkAutoLogin(){
         if(!state.holdPlans) state.holdPlans = [];
         if(!state.yard) state.yard = {name:'', notes:''};
         if(!state.lang) state.lang = localStorage.getItem('roster_lang') || 'en';
-        ensureKPI();
+        ensureKPI(); ensureYardData();
         document.documentElement.setAttribute('lang', state.lang);
         document.documentElement.setAttribute('dir', state.lang==='ar'?'rtl':'ltr');
       }
@@ -802,6 +814,7 @@ const TABS = [
   {id:'handover', label:'التسليم والتسلم', icon:'🔄'},
   {id:'holdplan', label:'مخطط العنابر', icon:'🚢'},
   {id:'kpi', label:'الأداء والـ KPIs', icon:'📊'},
+  {id:'yardmgmt', label:'اليارد', icon:'🏭'},
   {id:'reports', label:'سجل العمليات', icon:'🧾'},
   {id:'settings', label:'الإعدادات', icon:'⚙️'},
 ];
@@ -849,11 +862,13 @@ function renderTab(){
   else if(currentTab==='handover') c.innerHTML = viewHandover();
   else if(currentTab==='holdplan') c.innerHTML = viewHoldPlan();
   else if(currentTab==='kpi') c.innerHTML = viewKPI();
+  else if(currentTab==='yardmgmt') c.innerHTML = viewYardMgmt();
   else if(currentTab==='reports') c.innerHTML = viewReports();
   else if(currentTab==='settings') c.innerHTML = viewSettings();
   bindTabEvents();
   applyDynamicTableSizing();
   if(currentTab==='kpi') renderKPICharts();
+  if(currentTab==='yardmgmt') renderYardChart();
 }
 
 /* =========================================================
@@ -2853,10 +2868,18 @@ function viewHoldPlan(){
       </div>
       <div class="field"><label>أو اكتب اسم مركب يدوياً</label><input id="hpManualVessel" placeholder="اسم مركب جديد"></div>
     </div>
-    <div class="field"><label>عدد العنابر</label>
-      <select id="hpHoldsCount">
-        ${[2,3,4,5,6,7,8,9].map(n=>`<option value="${n}" ${n===9?'selected':''}>${n} عنابر</option>`).join('')}
-      </select>
+    <div class="g2">
+      <div class="field"><label>عدد العنابر</label>
+        <select id="hpHoldsCount">
+          ${[2,3,4,5,6,7,8,9].map(n=>`<option value="${n}" ${n===9?'selected':''}>${n} عنابر</option>`).join('')}
+        </select>
+      </div>
+      <div class="field"><label>نوع العملية</label>
+        <select id="hpOpType">
+          <option value="discharge">🔽 تفريغ (Discharge)</option>
+          <option value="load">🔼 شحن (Loading)</option>
+        </select>
+      </div>
     </div>
     <button class="btn-gold" onclick="addHoldPlanEntry()">إضافة وتوليد مخطط المركب</button>
   </div>
@@ -2869,13 +2892,28 @@ function addHoldPlanEntry(){
   const pick = document.getElementById('hpPickVessel').value;
   const manual = document.getElementById('hpManualVessel').value.trim();
   const holdsCount = Number(document.getElementById('hpHoldsCount').value)||9;
+  const opType = document.getElementById('hpOpType').value || 'discharge';
   let name;
   if(pick){ name = state.vessels.find(v=>v.id===pick).name; }
   else if(manual){ name = manual; }
   else { alert('اختر مركب أو اكتب اسمه'); return; }
   const holds = Array.from({length:holdsCount}, (_,i)=>({index:i+1, craneNumber:'', loaderNumber:'', radioChannel:'', capacity:'', qty:'', done:false}));
-  state.holdPlans.push({id:uid(), name, holdsCount, date:todayStr(), holds});
-  log('مخطط عنابر','إضافة مركب',null,{name,holdsCount});
+  state.holdPlans.push({id:uid(), name, holdsCount, opType, date:todayStr(), holds});
+  log('مخطط عنابر','إضافة مركب',null,{name,holdsCount,opType});
+  saveState(); renderTab();
+}
+function reassignCrane(planId, craneNumber, fromHoldIndex, toHoldIndex){
+  const p = state.holdPlans.find(x=>x.id===planId);
+  if(!p) return;
+  toHoldIndex = Number(toHoldIndex);
+  if(!toHoldIndex){ alert('اختر العنبر المطلوب نقل الونش إليه'); return; }
+  const from = p.holds.find(h=>h.index===Number(fromHoldIndex));
+  const to = p.holds.find(h=>h.index===toHoldIndex);
+  if(!from || !to) return;
+  if(to.craneNumber){ if(!confirm(`عنبر ${to.index} فيه ونش ${to.craneNumber} بالفعل، عايز تستبدله؟`)) return; }
+  from.craneNumber = '';
+  to.craneNumber = craneNumber;
+  log('مخطط عنابر','نقل ونش', {hold:from.index}, {hold:to.index, crane:craneNumber});
   saveState(); renderTab();
 }
 
@@ -2922,6 +2960,36 @@ function toggleHoldDone(planId, holdIndex){
   saveState(); renderTab();
 }
 
+/* When a hold finishes (all its quantity discharged, or fully loaded), its crane
+   needs to move to the next hold — for both discharge and loading plans. This
+   widget makes that an explicit one-tap action instead of manually re-picking
+   the crane from each hold's own dropdown. */
+function renderCraneReassignWidget(p){
+  const assignedHolds = p.holds.filter(h=>h.craneNumber);
+  if(!assignedHolds.length) return '';
+  return `
+  <div class="notice" style="margin:12px 0;">
+    <b>🔁 نقل ونش بين العنابر</b> — لما عنبر يخلص (تفريغ أو شحن بالكامل)، انقل الونش بتاعه هنا لعنبر تاني:
+    <div class="g2" style="margin-top:8px;">
+      <div class="field"><label>الونش المطلوب نقله</label>
+        <select id="reassignCraneSrc-${p.id}">
+          ${assignedHolds.map(h=>`<option value="${h.index}">ونش ${esc(h.craneNumber)} — من عنبر ${h.index}</option>`).join('')}
+        </select>
+      </div>
+      <div class="field"><label>نقل إلى عنبر رقم</label>
+        <select id="reassignCraneDst-${p.id}">
+          ${p.holds.map(h=>`<option value="${h.index}">عنبر ${h.index}${h.done?' (تم الانتهاء)':''}${h.craneNumber?' — فيه ونش '+esc(h.craneNumber):''}</option>`).join('')}
+        </select>
+      </div>
+    </div>
+    <button class="btn-ghost btn-sm" onclick="(function(){
+      const src=document.getElementById('reassignCraneSrc-${p.id}').value;
+      const dst=document.getElementById('reassignCraneDst-${p.id}').value;
+      const h=state.holdPlans.find(x=>x.id==='${esc(p.id)}').holds.find(x=>x.index==src);
+      reassignCrane('${esc(p.id)}', h.craneNumber, src, dst);
+    })()">نقل الونش الآن</button>
+  </div>`;
+}
 function renderHoldPlanEntries(){
   if(!state.holdPlans.length) return `<div class="empty muted">لم تتم إضافة أي مخطط مركب بعد</div>`;
   const cranesList = state.crew.cranes || [];
@@ -2930,7 +2998,9 @@ function renderHoldPlanEntries(){
   return state.holdPlans.map(p=>`
     <div class="card" style="margin-bottom:20px;">
       <div class="row" style="justify-content:space-between; margin-bottom:12px;">
-        <h2>🚢 مركب: <span style="color:var(--gold);">${esc(p.name)}</span></h2>
+        <h2>🚢 مركب: <span style="color:var(--gold);">${esc(p.name)}</span>
+          <span class="pill ${p.opType==='load'?'pill-B':'pill-A'}" style="margin-inline-start:8px;">${p.opType==='load'?'🔼 شحن':'🔽 تفريغ'}</span>
+        </h2>
         <div class="row">
           <button class="btn-ghost btn-sm" onclick="shareElement('holdPlanCapture-${p.id}','hold_plan_${esc(p.name)}_${todayStr()}.png','#0b1220')">📤 مشاركة الصورة</button>
           <button class="btn-danger btn-sm" onclick="removeHoldPlanEntry('${esc(p.id)}')">حذف</button>
@@ -2943,6 +3013,8 @@ function renderHoldPlanEntries(){
           ${[2,3,4,5,6,7,8,9].map(n=>`<option value="${n}" ${n===p.holdsCount?'selected':''}>${n} عنابر</option>`).join('')}
         </select>
       </div>
+
+      ${renderCraneReassignWidget(p)}
 
       <div class="holdplan-controls">
         ${p.holds.map(h=>`
@@ -2964,10 +3036,10 @@ function renderHoldPlanEntries(){
               <input value="${esc(h.radioChannel||'')}" placeholder="مثال: CH 68" oninput="updateHoldField('${esc(p.id)}',${h.index},'radioChannel',this.value)">
             </div>
             <div class="g2" style="gap:8px;">
-              <div class="field"><label>أقصى سعة العنبر (طن)</label>
+              <div class="field"><label>أقصى سعة العنبر (طن) — تقريبية</label>
                 <input type="number" min="0" value="${esc(h.capacity||'')}" placeholder="مثال: 18000" oninput="updateHoldField('${esc(p.id)}',${h.index},'capacity',this.value)">
               </div>
-              <div class="field"><label>الكمية الحالية (طن)</label>
+              <div class="field"><label>الكمية الحالية (طن) — تقريبية</label>
                 <input type="number" min="0" value="${esc(h.qty||'')}" placeholder="مثال: 15000" oninput="updateHoldField('${esc(p.id)}',${h.index},'qty',this.value)">
               </div>
             </div>
@@ -3087,12 +3159,14 @@ function buildVesselSVG(plan){
 
     let qtyText = '';
     if(qty>0 && capacity>0){
-      qtyText = `<text x="${cellCx}" y="${bottomY-16}" text-anchor="middle" font-size="12.5" font-weight="700" fill="#f1f5f9">${qty.toLocaleString('en-US')} / ${capacity.toLocaleString('en-US')} ${ar?'طن':'t'}</text>`;
+      qtyText = `<text x="${cellCx}" y="${bottomY-28}" text-anchor="middle" font-size="12.5" font-weight="700" fill="#f1f5f9">~${qty.toLocaleString('en-US')} / ${capacity.toLocaleString('en-US')} ${ar?'طن':'t'}</text>
+        <text x="${cellCx}" y="${bottomY-13}" text-anchor="middle" font-size="9.5" font-style="italic" fill="#8fa3c2">${ar?'(كمية تقريبية)':'(approx. quantity)'}</text>`;
     } else if(qty>0){
-      qtyText = `<text x="${cellCx}" y="${bottomY-16}" text-anchor="middle" font-size="12.5" font-weight="700" fill="#f1f5f9">${qty.toLocaleString('en-US')} ${ar?'طن':'t'}</text>`;
+      qtyText = `<text x="${cellCx}" y="${bottomY-28}" text-anchor="middle" font-size="12.5" font-weight="700" fill="#f1f5f9">~${qty.toLocaleString('en-US')} ${ar?'طن':'t'}</text>
+        <text x="${cellCx}" y="${bottomY-13}" text-anchor="middle" font-size="9.5" font-style="italic" fill="#8fa3c2">${ar?'(كمية تقريبية)':'(approx. quantity)'}</text>`;
     }
 
-    const radioText = h.radioChannel ? `<text x="${cellCx}" y="${topY+38}" text-anchor="middle" font-size="10.5" fill="#8fa3c2">${esc(h.radioChannel)}</text>` : '';
+    const radioText = h.radioChannel ? `<text x="${cellCx}" y="${topY+38}" text-anchor="middle" font-size="10" fill="#8fa3c2">📻 ${ar?'موجه الراديو':'Radio Ch.'}: ${esc(h.radioChannel)}</text>` : '';
     const doneText = h.done ? `<text x="${cellCx}" y="${topY+54}" text-anchor="middle" font-size="10.5" font-weight="800" fill="#34d399">${ar?'تم الانتهاء من العنبر':'Hold Completed'}</text>` : '';
 
     holdBodies.push(`
@@ -3226,7 +3300,7 @@ let kpiChartInstances = {};
 function switchKPISubTab(id){ kpiSubTab = id; renderTab(); }
 
 function viewKPI(){
-  ensureKPI();
+  ensureKPI(); ensureYardData();
   const ar = currentLang()==='ar';
   const subtabs = [
     {id:'log', ar:'تسجيل وردية / مركب', en:'Vessel / Shift Log'},
@@ -3305,7 +3379,16 @@ function renderKPILogForm(){
               ${operators.map(o=>`<option value="${esc(o.id)}" ${e.operatorId===o.id?'selected':''}>${esc(o.name)}</option>`).join('')}
             </select>
           </div>
-          <div class="field"><label>${ar?'عدد الساعات':'Hours worked'}</label><input type="number" min="0" step="0.5" value="${e.hours||''}" oninput="updateKPICraneRow(${i},'hours',this.value)"></div>
+          <div class="field"><label>${ar?'عدد الساعات (بمضاعفات نصف ساعة)':'Hours worked (in 30-min steps)'}</label>
+            <div class="stepper">
+              <button type="button" class="stepper-btn" onclick="bumpKPICraneHours(${i},-0.5)">−</button>
+              <span class="stepper-val">${(e.hours||0).toFixed(1)} ${ar?'س':'hr'}</span>
+              <button type="button" class="stepper-btn" onclick="bumpKPICraneHours(${i},0.5)">+</button>
+            </div>
+            <div class="stepper-presets">
+              ${[0.5,1,2,4,8,12].map(v=>`<button type="button" class="chip-btn" onclick="setKPICraneHours(${i},${v})">${v} ${ar?'س':'h'}</button>`).join('')}
+            </div>
+          </div>
           <div class="field"><label>${ar?'عدد الحركات (Moves)':'Moves count'}</label><input type="number" min="0" value="${e.moves||''}" oninput="updateKPICraneRow(${i},'moves',this.value)"></div>
           <div class="field"><label>${ar?'الأطنان المنقولة':'Tons moved'}</label><input type="number" min="0" value="${e.tons||''}" oninput="updateKPICraneRow(${i},'tons',this.value)"></div>
           <div class="field"><label class="muted">${ar?'المعدل المحسوب':'Computed rate'}</label>
@@ -3353,6 +3436,20 @@ function updateKPICraneRow(i, field, val){
   renderTab();
 }
 function removeKPICraneRow(i){ kpiDraft.craneEntries.splice(i,1); renderTab(); }
+function bumpKPICraneHours(i, delta){
+  const e = kpiDraft.craneEntries[i]; if(!e) return;
+  const v = Math.max(0, +(( (e.hours||0) + delta ).toFixed(1)));
+  updateKPICraneRow(i,'hours', v);
+}
+function setKPICraneHours(i, val){ updateKPICraneRow(i,'hours', val); }
+function bumpNumberInput(id, delta, min){
+  const el = document.getElementById(id); if(!el) return;
+  const ar = currentLang()==='ar';
+  let v = Math.max(min!=null?min:0, (parseFloat(el.value)||0) + delta);
+  el.value = v;
+  const lbl = document.getElementById(id+'Label');
+  if(lbl) lbl.textContent = `${v} ${ar?'د':'min'}`;
+}
 function addKPIDelayRow(){ kpiDraft.delays.push({id:uid(), code:'other', minutes:0, note:''}); renderTab(); }
 function updateKPIDelayRow(i, field, val){
   const d = kpiDraft.delays[i]; if(!d) return;
@@ -3362,7 +3459,7 @@ function updateKPIDelayRow(i, field, val){
 function removeKPIDelayRow(i){ kpiDraft.delays.splice(i,1); renderTab(); }
 
 function saveKPIVesselLog(){
-  ensureKPI();
+  ensureKPI(); ensureYardData();
   const ar = currentLang()==='ar';
   const cranes = state.crew.cranes||[], operators = state.crew.operators||[];
   const vesselId = document.getElementById('kpiVessel').value;
@@ -3473,7 +3570,7 @@ function typeLabel(type, ar){
   return (map[type]||[type])[0];
 }
 function saveKPIIncident(){
-  ensureKPI();
+  ensureKPI(); ensureYardData();
   const cranes = state.crew.cranes||[];
   const craneId = document.getElementById('incCrane').value;
   const desc = document.getElementById('incDesc').value.trim();
@@ -3515,7 +3612,17 @@ function renderKPIBreakdowns(){
           <option value="other">${ar?'أخرى':'Other'}</option>
         </select>
       </div>
-      <div class="field"><label>${ar?'مدة التوقف (دقيقة)':'Downtime (minutes)'}</label><input id="bkDowntime" type="number" min="0" placeholder="0"></div>
+      <div class="field"><label>${ar?'مدة التوقف (بالدقيقة ومضاعفاتها)':'Downtime (in minutes, multiples)'}</label>
+        <input id="bkDowntime" type="number" min="0" step="1" value="0" readonly style="text-align:center;font-weight:800;">
+        <div class="stepper" style="margin-top:6px;">
+          <button type="button" class="stepper-btn" onclick="bumpNumberInput('bkDowntime',-1,0)">−</button>
+          <span class="stepper-val" id="bkDowntimeLabel">0 ${ar?'د':'min'}</span>
+          <button type="button" class="stepper-btn" onclick="bumpNumberInput('bkDowntime',1,0)">+</button>
+        </div>
+        <div class="stepper-presets">
+          ${[5,10,15,30,60,120].map(v=>`<button type="button" class="chip-btn" onclick="document.getElementById('bkDowntime').value=${v};bumpNumberInput('bkDowntime',0,0)">+${v}</button>`).join('')}
+        </div>
+      </div>
       <div class="field"><label>${ar?'مدة الوردية المخططة (دقيقة)':'Planned shift time (minutes)'}</label><input id="bkPlanned" type="number" min="1" value="720"></div>
       <div class="field" style="grid-column:1/-1;"><label>${ar?'سبب العطل':'Cause / notes'}</label><textarea id="bkNote" rows="2"></textarea></div>
     </div>
@@ -3538,7 +3645,7 @@ function renderKPIBreakdowns(){
   </div>`;
 }
 function saveKPIBreakdown(){
-  ensureKPI();
+  ensureKPI(); ensureYardData();
   const ar = currentLang()==='ar';
   const cranes = state.crew.cranes||[];
   const craneId = document.getElementById('bkCrane').value;
@@ -3584,7 +3691,7 @@ function destroyKPICharts(){
 }
 function renderKPICharts(){
   if(kpiSubTab!=='dashboard' || typeof Chart==='undefined') return;
-  ensureKPI();
+  ensureKPI(); ensureYardData();
   destroyKPICharts();
   const ar = currentLang()==='ar';
   const logs = state.kpi.vesselLogs||[];
@@ -3647,7 +3754,7 @@ function periodStartDate(period){
   return new Date(0);
 }
 function filterKPIByPeriod(){
-  ensureKPI();
+  ensureKPI(); ensureYardData();
   const start = periodStartDate(kpiReportPeriod);
   const inRange = (iso)=> new Date(iso) >= start;
   return {
@@ -3698,6 +3805,19 @@ function renderKPIExport(){
     <button class="btn-ghost" onclick="shareElement('kpiReportCapture','kpi_report_${todayStr()}.png','#ffffff')">🖼️ ${ar?'تصدير صورة / PDF':'Export image / PDF'}</button>
   </div>`;
 }
+/* SheetJS's free build can't embed a raster logo image inside a worksheet, so as
+   the clearest professional substitute every sheet gets a merged brand title row
+   (kept in its own row above the data, never overlapping a data cell). */
+function sheetWithBrandHeader(rows, ar){
+  const ws = XLSX.utils.json_to_sheet(rows, {origin:'A3'});
+  XLSX.utils.sheet_add_aoa(ws, [
+    [ar?'AF Logic — جناح عمليات الموانئ والورديات':'AF Logic — Port Operations & Roster Suite'],
+    [`${ar?'تاريخ التصدير':'Exported'}: ${new Date().toLocaleString('en-GB')}`]
+  ], {origin:'A1'});
+  const colCount = rows.length ? Object.keys(rows[0]).length : 1;
+  ws['!merges'] = [{s:{r:0,c:0}, e:{r:0,c:Math.max(0,colCount-1)}}, {s:{r:1,c:0}, e:{r:1,c:Math.max(0,colCount-1)}}];
+  return ws;
+}
 function exportKPIExcel(){
   const ar = currentLang()==='ar';
   if(typeof XLSX==='undefined'){ alert(ar?'تعذر تحميل مكتبة التصدير':'Export library failed to load'); return; }
@@ -3715,17 +3835,237 @@ function exportKPIExcel(){
       });
     }
   });
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(logRows), 'Vessel Shift Logs');
+  XLSX.utils.book_append_sheet(wb, sheetWithBrandHeader(logRows.length?logRows:[{Date:'',Shift:'',Vessel:'',Cargo_Tons:'',Weather:'',Wind_kmh:'',Crane:'',Operator:'',Hours:'',Moves:'',Tons:'',Tons_per_hr:''}], ar), 'Vessel Shift Logs');
 
   const delayRows = [];
   vesselLogs.forEach(l=> (l.delays||[]).forEach(d=> delayRows.push({Date:l.date, Vessel:l.vesselName, Reason:d.code, Minutes:d.minutes, Note:d.note})));
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(delayRows.length?delayRows:[{Date:'',Vessel:'',Reason:'',Minutes:'',Note:''}]), 'Delays');
+  XLSX.utils.book_append_sheet(wb, sheetWithBrandHeader(delayRows.length?delayRows:[{Date:'',Vessel:'',Reason:'',Minutes:'',Note:''}], ar), 'Delays');
 
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(incidents.length?incidents.map(i=>({Date:i.date,Type:i.type,Severity:i.severity,Crane:i.craneName,Description:i.description,By:i.user})):[{Date:'',Type:'',Severity:'',Crane:'',Description:'',By:''}]), 'HSE Incidents');
+  XLSX.utils.book_append_sheet(wb, sheetWithBrandHeader(incidents.length?incidents.map(i=>({Date:i.date,Type:i.type,Severity:i.severity,Crane:i.craneName,Description:i.description,By:i.user})):[{Date:'',Type:'',Severity:'',Crane:'',Description:'',By:''}], ar), 'HSE Incidents');
 
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(breakdowns.length?breakdowns.map(b=>({Date:b.date,Crane:b.craneName,Type:b.type,Downtime_min:b.downtimeMinutes,Planned_min:b.plannedMinutes,OEE_pct: b.plannedMinutes>0?+Math.max(0,((b.plannedMinutes-b.downtimeMinutes)/b.plannedMinutes)*100).toFixed(1):100, Note:b.note})):[{Date:'',Crane:'',Type:'',Downtime_min:'',Planned_min:'',OEE_pct:'',Note:''}]), 'Breakdowns & OEE');
+  XLSX.utils.book_append_sheet(wb, sheetWithBrandHeader(breakdowns.length?breakdowns.map(b=>({Date:b.date,Crane:b.craneName,Type:b.type,Downtime_min:b.downtimeMinutes,Planned_min:b.plannedMinutes,OEE_pct: b.plannedMinutes>0?+Math.max(0,((b.plannedMinutes-b.downtimeMinutes)/b.plannedMinutes)*100).toFixed(1):100, Note:b.note})):[{Date:'',Crane:'',Type:'',Downtime_min:'',Planned_min:'',OEE_pct:'',Note:''}], ar), 'Breakdowns & OEE');
 
   XLSX.writeFile(wb, `KPI_Report_${kpiReportPeriod}_${todayStr()}.xlsx`);
+}
+
+/* ===================== YARD MANAGEMENT MODULE ===================== */
+let yardSubTab = 'log';
+let yardDraftDirection = 'in';
+function switchYardSubTab(id){ yardSubTab = id; renderTab(); }
+function setYardDirection(v){ yardDraftDirection = v; renderTab(); }
+
+function viewYardMgmt(){
+  ensureYardData();
+  const ar = currentLang()==='ar';
+  const subtabs = [
+    {id:'log', ar:'تسجيل حركة يارد', en:'Log yard movement'},
+    {id:'balances', ar:'أرصدة الياردات', en:'Yard balances'},
+    {id:'yards', ar:'إدارة الياردات', en:'Manage yards'}
+  ];
+  return `
+  <h1>🏭 ${ar?'إدارة اليارد':'Yard Management'}</h1>
+  <div class="tabs" style="margin-bottom:16px;flex-wrap:wrap;">
+    ${subtabs.map(s=>`<div class="tab ${yardSubTab===s.id?'active':''}" onclick="switchYardSubTab('${s.id}')">${ar?s.ar:s.en}</div>`).join('')}
+  </div>
+  ${yardSubTab==='log' ? renderYardLogForm() : ''}
+  ${yardSubTab==='balances' ? renderYardBalances() : ''}
+  ${yardSubTab==='yards' ? renderYardManageList() : ''}
+  `;
+}
+
+/* ---------- Manage yard names ---------- */
+function renderYardManageList(){
+  const ar = currentLang()==='ar';
+  const yards = state.yardData.yards;
+  return `
+  <div class="card" style="margin-bottom:16px;">
+    <h2>➕ ${ar?'إضافة يارد جديد':'Add a new yard'}</h2>
+    <div class="row">
+      <input id="newYardName" placeholder="${ar?'اسم اليارد (مثال: يارد A، مشون 2)':'Yard name (e.g. Yard A, Shed 2)'}" style="flex:1;min-width:200px;">
+      <button class="btn-gold" onclick="addYard()">${ar?'إضافة':'Add'}</button>
+    </div>
+  </div>
+  <div class="card">
+    <h2>📋 ${ar?'الياردات المسجلة':'Registered yards'}</h2>
+    ${!yards.length?`<div class="empty muted">${ar?'لا توجد ياردات مسجلة بعد':'No yards yet'}</div>`:
+      yards.map(y=>`
+      <div class="list-item">
+        <div><b style="color:var(--gold);">${esc(y.name)}</b></div>
+        <button class="btn-danger btn-sm" onclick="removeYard('${esc(y.id)}')">🗑️ ${ar?'حذف':'Remove'}</button>
+      </div>`).join('')}
+  </div>`;
+}
+function addYard(){
+  ensureYardData();
+  const ar = currentLang()==='ar';
+  const name = document.getElementById('newYardName').value.trim();
+  if(!name){ alert(ar?'اكتب اسم اليارد':'Enter a yard name'); return; }
+  state.yardData.yards.push({id:uid(), name});
+  log('yard','create_yard',null,name);
+  saveState(); renderTab();
+}
+function removeYard(id){
+  const ar = currentLang()==='ar';
+  if(!confirm(ar?'حذف هذا اليارد؟ (السجلات القديمة هتفضل موجودة بالاسم)':'Remove this yard? (past records keep the name)')) return;
+  state.yardData.yards = state.yardData.yards.filter(y=>y.id!==id);
+  log('yard','delete_yard',id,null);
+  saveState(); renderTab();
+}
+
+/* ---------- Log a yard movement ---------- */
+function renderYardLogForm(){
+  const ar = currentLang()==='ar';
+  const yards = state.yardData.yards;
+  if(!yards.length){
+    return `<div class="notice">${ar?'من فضلك أضف يارد واحد على الأقل من تبويب "إدارة الياردات" قبل تسجيل أي حركة.':'Please add at least one yard from the "Manage yards" tab before logging a movement.'}</div>`;
+  }
+  return `
+  <div class="card" style="margin-bottom:16px;">
+    <h2>📦 ${ar?'تسجيل حركة بضاعة':'Log a cargo movement'}</h2>
+    <div class="g2">
+      <div class="field"><label>${ar?'التاريخ':'Date'}</label><input id="yardDate" type="date" value="${todayStr()}"></div>
+      <div class="field"><label>${ar?'شيفت اليارد':'Yard shift'}</label><input id="yardShift" placeholder="${ar?'مثال: صباحي / مسائي':'e.g. Morning / Night'}"></div>
+      <div class="field"><label>${ar?'نوع الحركة':'Movement type'}</label>
+        <select id="yardDirection" onchange="setYardDirection(this.value)">
+          <option value="in" ${yardDraftDirection==='in'?'selected':''}>${ar?'🔽 استلام في اليارد':'🔽 Receive into yard'}</option>
+          <option value="out" ${yardDraftDirection==='out'?'selected':''}>${ar?'🔼 صرف من اليارد':'🔼 Dispatch from yard'}</option>
+          <option value="transfer" ${yardDraftDirection==='transfer'?'selected':''}>${ar?'↔️ نقل بين ياردين':'↔️ Transfer between yards'}</option>
+          <option value="internal" ${yardDraftDirection==='internal'?'selected':''}>${ar?'🔃 نقل داخلي (جنب لجنب في نفس اليارد)':'🔃 Internal move (side to side, same yard)'}</option>
+        </select>
+      </div>
+      <div class="field"><label>${ar?'نوع البضاعة':'Cargo type'}</label>
+        <select id="yardCargoType">${CARGO_TYPES.map(c=>`<option value="${c.id}">${ar?c.ar:c.en}</option>`).join('')}</select>
+      </div>
+      <div class="field"><label>${ar?'اليارد':'Yard'}</label>
+        <select id="yardFrom">${yards.map(y=>`<option value="${esc(y.id)}">${esc(y.name)}</option>`).join('')}</select>
+      </div>
+      ${(yardDraftDirection==='transfer'||yardDraftDirection==='internal') ? `
+      <div class="field" id="yardToWrap"><label>${ar?'إلى يارد':'To yard'}</label>
+        <select id="yardTo">${yards.map(y=>`<option value="${esc(y.id)}">${esc(y.name)}</option>`).join('')}</select>
+      </div>` : ''}
+      <div class="field"><label>${ar?'الكمية (طن) — من الميزان':'Quantity (tons) — from weighbridge'}</label>
+        <input id="yardQty" type="number" min="0" step="0.01" placeholder="0.00">
+      </div>
+      <div class="field"><label>${ar?'مصدر القراءة':'Reading source'}</label>
+        <select id="yardSource">
+          <option value="weighbridge">${ar?'⚖️ الميزان':'⚖️ Weighbridge'}</option>
+          <option value="manual">${ar?'تقدير يدوي':'Manual estimate'}</option>
+        </select>
+      </div>
+      <div class="field" style="grid-column:1/-1;"><label>${ar?'ملاحظة (اختياري)':'Note (optional)'}</label><input id="yardNote" placeholder="${ar?'رقم تريلة، اسم عميل، إلخ':'Truck no., customer, etc.'}"></div>
+    </div>
+    <button class="btn-gold" style="width:100%;margin-top:10px;" onclick="saveYardTransaction()">💾 ${ar?'حفظ الحركة':'Save movement'}</button>
+  </div>
+  <div class="card">
+    <h2>📋 ${ar?'آخر حركات اليارد':'Recent yard movements'}</h2>
+    ${renderYardTransactionList()}
+  </div>`;
+}
+function saveYardTransaction(){
+  ensureYardData();
+  const ar = currentLang()==='ar';
+  const yards = state.yardData.yards;
+  const direction = document.getElementById('yardDirection').value;
+  const fromId = document.getElementById('yardFrom').value;
+  const toEl = document.getElementById('yardTo');
+  const toId = toEl ? toEl.value : '';
+  const qty = parseFloat(document.getElementById('yardQty').value)||0;
+  if(qty<=0){ alert(ar?'من فضلك أدخل كمية أكبر من صفر':'Please enter a quantity greater than zero'); return; }
+  if((direction==='transfer') && toId===fromId){ alert(ar?'اختر يارد مختلف للنقل إليه':'Pick a different destination yard'); return; }
+  const fromYard = yards.find(y=>y.id===fromId);
+  const toYard = toId ? yards.find(y=>y.id===toId) : null;
+  const entry = {
+    id: uid(), createdAt: new Date().toISOString(), date: document.getElementById('yardDate').value||todayStr(),
+    shift: document.getElementById('yardShift').value||'', direction,
+    cargoType: document.getElementById('yardCargoType').value,
+    yardId: fromId, yardName: fromYard?fromYard.name:'',
+    toYardId: toId||null, toYardName: toYard?toYard.name:null,
+    quantity: qty, source: document.getElementById('yardSource').value,
+    note: document.getElementById('yardNote').value.trim(), user: state.name
+  };
+  state.yardData.transactions.unshift(entry);
+  log('yard','transaction',null,`${entry.direction} ${entry.yardName} ${entry.quantity}t`);
+  saveState();
+  yardDraftDirection = 'in';
+  renderTab();
+}
+function removeYardTransaction(id){
+  const ar = currentLang()==='ar';
+  if(!confirm(ar?'حذف هذه الحركة؟':'Delete this movement?')) return;
+  state.yardData.transactions = state.yardData.transactions.filter(t=>t.id!==id);
+  log('yard','delete_transaction',id,null);
+  saveState(); renderTab();
+}
+function yardDirLabel(dir, ar){
+  const map = {in:[ar?'🔽 استلام':'🔽 Receive'], out:[ar?'🔼 صرف':'🔼 Dispatch'], transfer:[ar?'↔️ نقل بين ياردين':'↔️ Transfer'], internal:[ar?'🔃 نقل داخلي':'🔃 Internal move']};
+  return (map[dir]||[dir])[0];
+}
+function renderYardTransactionList(){
+  const ar = currentLang()==='ar';
+  const list = state.yardData.transactions.slice(0,20);
+  if(!list.length) return `<div class="empty muted">${ar?'لا توجد حركات مسجلة':'No movements yet'}</div>`;
+  return list.map(t=>`
+    <div class="list-item">
+      <div>
+        <div class="row"><b style="color:var(--gold);">${yardDirLabel(t.direction,ar)}</b> — <span class="muted">${esc(t.date)} ${t.shift?('· '+esc(t.shift)):''}</span></div>
+        <div>${esc(t.yardName)}${t.toYardName?` → ${esc(t.toYardName)}`:''} — <b>${t.quantity.toLocaleString('en-US')} ${ar?'طن':'t'}</b> ${t.source==='weighbridge'?(ar?'(⚖️ ميزان)':'(⚖️ weighbridge)'):(ar?'(تقدير)':'(estimate)')}</div>
+        ${t.note?`<div class="muted">${esc(t.note)}</div>`:''}
+      </div>
+      <button class="btn-danger btn-sm" onclick="removeYardTransaction('${esc(t.id)}')">🗑️</button>
+    </div>`).join('');
+}
+
+/* ---------- Balances dashboard ---------- */
+function computeYardBalances(){
+  ensureYardData();
+  const balances = {};
+  state.yardData.yards.forEach(y=> balances[y.id] = {name:y.name, in:0, out:0, transferIn:0, transferOut:0});
+  state.yardData.transactions.forEach(t=>{
+    if(!balances[t.yardId]) balances[t.yardId] = {name:t.yardName, in:0, out:0, transferIn:0, transferOut:0};
+    if(t.direction==='in') balances[t.yardId].in += t.quantity;
+    else if(t.direction==='out') balances[t.yardId].out += t.quantity;
+    else if(t.direction==='transfer'){
+      balances[t.yardId].transferOut += t.quantity;
+      if(t.toYardId){
+        if(!balances[t.toYardId]) balances[t.toYardId] = {name:t.toYardName, in:0, out:0, transferIn:0, transferOut:0};
+        balances[t.toYardId].transferIn += t.quantity;
+      }
+    }
+  });
+  Object.values(balances).forEach(b=> b.balance = b.in + b.transferIn - b.out - b.transferOut);
+  return balances;
+}
+function renderYardBalances(){
+  const ar = currentLang()==='ar';
+  const balances = computeYardBalances();
+  const rows = Object.values(balances);
+  return `
+  <div class="card" style="margin-bottom:16px;">
+    <h2>📊 ${ar?'الرصيد الحالي لكل يارد':'Current balance per yard'}</h2>
+    ${!rows.length ? `<div class="empty muted">${ar?'لا توجد بيانات بعد':'No data yet'}</div>` :
+    `<table><thead><tr>
+      <th>${ar?'اليارد':'Yard'}</th><th>${ar?'إجمالي استلام':'Total received'}</th><th>${ar?'إجمالي صرف':'Total dispatched'}</th><th>${ar?'الرصيد الحالي':'Current balance'}</th>
+    </tr></thead><tbody>
+      ${rows.map(b=>`<tr><td><b>${esc(b.name)}</b></td><td>${(b.in+b.transferIn).toLocaleString('en-US')} ${ar?'طن':'t'}</td><td>${(b.out+b.transferOut).toLocaleString('en-US')} ${ar?'طن':'t'}</td><td style="color:var(--gold);font-weight:800;">~${b.balance.toLocaleString('en-US')} ${ar?'طن (تقريبي)':'t (approx.)'}</td></tr>`).join('')}
+    </tbody></table>`}
+  </div>
+  <div class="card">
+    <h2>📈 ${ar?'رسم بياني — الكمية الحالية بكل يارد':'Chart — current quantity per yard'}</h2>
+    <canvas id="chartYardBalance" height="110"></canvas>
+  </div>`;
+}
+function renderYardChart(){
+  if(yardSubTab!=='balances' || typeof Chart==='undefined') return;
+  const c = document.getElementById('chartYardBalance');
+  if(!c) return;
+  if(kpiChartInstances.yardChart){ try{kpiChartInstances.yardChart.destroy();}catch(e){} }
+  const ar = currentLang()==='ar';
+  const balances = Object.values(computeYardBalances());
+  kpiChartInstances.yardChart = new Chart(c, {
+    type:'bar',
+    data:{ labels: balances.length?balances.map(b=>b.name):[ar?'لا بيانات':'No data'], datasets:[{label: ar?'طن (تقريبي)':'tons (approx.)', data: balances.length?balances.map(b=>+b.balance.toFixed(1)):[0], backgroundColor:'#34d399'}] },
+    options:{ responsive:true, plugins:{legend:{display:false}} }
+  });
 }
 
 function viewReports(){
@@ -3863,16 +4203,18 @@ function shareElement(elementId, filename, bgOverride){
       el.style.maxWidth = originalMaxWidth;
       el.style.overflow = originalOverflow;
 
-      canvas.toBlob(blob=>{
-        if(!blob){ alert('تعذر توليد الصورة'); return; }
-        const file = new File([blob], filename, {type:'image/png'});
-        if(navigator.canShare && navigator.canShare({files:[file]})){
-          navigator.share({files:[file], title:'Roster Report', text:'مشاركة تقرير الروستر'}).catch(err=>{
-            if(err.name !== 'AbortError') downloadCanvas(canvas, filename);
-          });
-        } else {
-          downloadCanvas(canvas, filename);
-        }
+      composeWithLogo(canvas, bgOverride).then(finalCanvas=>{
+        finalCanvas.toBlob(blob=>{
+          if(!blob){ alert('تعذر توليد الصورة'); return; }
+          const file = new File([blob], filename, {type:'image/png'});
+          if(navigator.canShare && navigator.canShare({files:[file]})){
+            navigator.share({files:[file], title:'Roster Report', text:'مشاركة تقرير الروستر'}).catch(err=>{
+              if(err.name !== 'AbortError') downloadCanvas(finalCanvas, filename);
+            });
+          } else {
+            downloadCanvas(finalCanvas, filename);
+          }
+        });
       });
     }).catch(err=>{
       el.style.background = originalBackground;
@@ -3885,6 +4227,55 @@ function shareElement(elementId, filename, bgOverride){
   });
 }
 
+/* Adds a dedicated brand header band ABOVE the captured content (never on top of
+   it, so data is never obscured) with the AF Logic logo, name and export timestamp.
+   Falls back to the plain content if the logo image can't be loaded. */
+let _logoImgCache = null;
+function composeWithLogo(sourceCanvas, bgOverride){
+  return new Promise((resolve)=>{
+    function draw(logo){
+      const isDark = !!bgOverride && bgOverride.toLowerCase()!=='#ffffff';
+      const bandH = Math.max(90, Math.min(170, Math.round(sourceCanvas.width*0.045)));
+      const out = document.createElement('canvas');
+      out.width = sourceCanvas.width;
+      out.height = sourceCanvas.height + bandH;
+      const ctx = out.getContext('2d');
+      ctx.fillStyle = isDark ? (bgOverride||'#0b1220') : '#ffffff';
+      ctx.fillRect(0,0,out.width,out.height);
+      ctx.fillStyle = '#e8b93f';
+      ctx.fillRect(0, bandH-4, out.width, 4);
+      const pad = bandH*0.22;
+      let textX = pad;
+      if(logo){
+        const logoH = bandH*0.6;
+        const logoW = logoH * (logo.width/logo.height);
+        ctx.drawImage(logo, pad, (bandH-logoH)/2, logoW, logoH);
+        textX = pad + logoW + pad*0.7;
+      }
+      const ar = currentLang && currentLang()==='ar';
+      ctx.textBaseline = 'middle';
+      ctx.textAlign = ar ? 'right' : 'left';
+      const anchorX = ar ? out.width - textX : textX;
+      ctx.fillStyle = isDark ? '#f1f5f9' : '#141406';
+      ctx.font = `700 ${Math.round(bandH*0.24)}px Arial, sans-serif`;
+      ctx.fillText('AF Logic', anchorX, bandH*0.38);
+      ctx.fillStyle = isDark ? '#9aa4b5' : '#5a5a5a';
+      ctx.font = `400 ${Math.round(bandH*0.145)}px Arial, sans-serif`;
+      ctx.fillText(ar ? 'Simply Better Logic — جناح عمليات الموانئ والورديات' : 'Simply Better Logic — Port Operations & Roster Suite', anchorX, bandH*0.68);
+      ctx.textAlign = ar ? 'left' : 'right';
+      ctx.font = `400 ${Math.round(bandH*0.16)}px Arial, sans-serif`;
+      ctx.fillText(new Date().toLocaleString('en-GB'), ar ? pad : out.width-pad, bandH*0.5);
+      ctx.drawImage(sourceCanvas, 0, bandH);
+      resolve(out);
+    }
+    if(_logoImgCache){ draw(_logoImgCache); return; }
+    const logo = new Image();
+    logo.crossOrigin = 'anonymous';
+    logo.onload = ()=>{ _logoImgCache = logo; draw(logo); };
+    logo.onerror = ()=> draw(null);
+    logo.src = 'af-logic-logo.png';
+  });
+}
 function downloadCanvas(canvas, filename){
   const link = document.createElement('a');
   link.download = filename;
