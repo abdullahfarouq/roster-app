@@ -562,6 +562,7 @@ body{font-family:var(--font-ar),"Cairo","Noto Naskh Arabic","Geeza Pro",sans-ser
 .print-tbt{padding:22px 26px!important;}
 .print-tbt h4{font-size:1.7rem!important;}
 .print-tbt p{font-size:1.65rem!important;line-height:1.9!important;}
+.print-meta-line{font-size:1.15rem;font-weight:700;color:#111;margin-bottom:16px;padding-bottom:10px;border-bottom:2px solid #e8b93f;}
 .roster-print-header{display:grid;grid-template-columns:1fr 1.35fr 1fr;align-items:center;gap:24px;margin-bottom:26px;direction:ltr;}
 .roster-print-header .rph-logo{display:flex;align-items:center;justify-content:flex-start;}
 .roster-print-header .rph-logo img{width:180px;height:180px;object-fit:contain;display:block;image-rendering:-webkit-optimize-contrast;image-rendering:crisp-edges;}
@@ -1606,6 +1607,7 @@ function viewPier(){
   <div class="row" style="justify-content:space-between;margin-top:22px;margin-bottom:10px;">
     <h3 style="margin:0;">جدول بيرس بلان المدمج (للتصدير كصورة)</h3>
     <button class="btn-gold btn-sm" onclick="sharePierTable()">📤 مشاركة صورة البيرس بلان بالكامل</button>
+    <button class="btn-ghost btn-sm" onclick="sharePierTablePDF()">📄 PDF</button>
   </div>
   ${buildPierPrintBundleHTML()}
 
@@ -1913,6 +1915,7 @@ function viewRoster(){
   <div class="row" style="justify-content:space-between;margin-top:22px;margin-bottom:10px;">
     <h3 style="margin:0;">جدول الروستر المدمج (للتصدير كصورة)</h3>
     <button class="btn-gold btn-sm" onclick="shareRosterTable('${esc(date)}')">📤 مشاركة صورة الروستر بالكامل</button>
+    <button class="btn-ghost btn-sm" onclick="shareRosterTablePDF('${esc(date)}')">📄 PDF</button>
   </div>
   ${buildRosterPrintBundleHTML(date)}
 
@@ -2489,14 +2492,7 @@ function buildRosterPrintBundleHTML(date){
   </div>` : '';
   return `
   <div id="rosterTableCapture" class="print-wrap">
-    <div class="roster-print-header">
-      <div class="rph-logo"><img src="af-logic-logo.png" alt="AF LOGIC"></div>
-      <div class="rph-title">ROSTER</div>
-      <div class="rph-meta" dir="${ar?'rtl':'ltr'}">
-        <div class="shift">${shift}</div>
-        <div class="date">${ar?'التاريخ: ':'Date: '}${esc(formattedDate)}</div>
-      </div>
-    </div>
+    <div class="print-meta-line">${ar?'الوردية':'Shift'}: <b>${shift}</b> &nbsp;|&nbsp; ${ar?'التاريخ':'Date'}: <b>${esc(formattedDate)}</b></div>
     ${tbtHTML}
     ${buildRosterTableHTML(date)}
     ${buildOtherTasksPrintHTML(date)}
@@ -2505,6 +2501,9 @@ function buildRosterPrintBundleHTML(date){
 
 function shareRosterTable(date){
   shareElement('rosterTableCapture', `roster_table_${esc(date)}.png`, '#ffffff');
+}
+function shareRosterTablePDF(date){
+  shareElementAsPDF('rosterTableCapture', `roster_table_${esc(date)}.pdf`, '#ffffff');
 }
 
 /* =========================================================
@@ -2569,20 +2568,16 @@ function buildPierPrintBundleHTML(){
   const todayLabel = new Date().toLocaleDateString(ar?'ar-EG':'en-GB',{year:'numeric',month:'long',day:'numeric'});
   return `
   <div id="pierTableCapture" class="print-wrap">
-    <div class="roster-print-header">
-      <div class="rph-logo"><img src="af-logic-logo.png" alt="AF LOGIC"></div>
-      <div class="rph-title">BERTH PLAN</div>
-      <div class="rph-meta" dir="${ar?'rtl':'ltr'}">
-        <div class="shift">${ar?'بيرس بلان':'Berth Plan'}</div>
-        <div class="date">${ar?'التاريخ: ':'Date: '}${esc(todayLabel)}</div>
-      </div>
-    </div>
+    <div class="print-meta-line">${ar?'بيرس بلان':'Berth Plan'} &nbsp;|&nbsp; ${ar?'التاريخ':'Date'}: <b>${esc(todayLabel)}</b></div>
     ${buildPierTableHTML()}
   </div>`;
 }
 
 function sharePierTable(){
   shareElement('pierTableCapture', `berth_plan_${todayStr()}.png`, '#ffffff');
+}
+function sharePierTablePDF(){
+  shareElementAsPDF('pierTableCapture', `berth_plan_${todayStr()}.pdf`, '#ffffff');
 }
 
 function assignOperatorText(date, vId, crId) {
