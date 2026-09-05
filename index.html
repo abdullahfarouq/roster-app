@@ -610,6 +610,18 @@ body{font-family:var(--font-ar),"Cairo","Noto Naskh Arabic","Geeza Pro",sans-ser
 .roster-brand-row img{width:160px!important;height:160px!important;object-fit:contain!important;image-rendering:-webkit-optimize-contrast;image-rendering:crisp-edges;}
 .roster-brand-copy strong{font-size:1.35rem!important;font-weight:900!important}
 .roster-brand-copy span{font-size:.86rem!important;font-weight:900!important;letter-spacing:2.6px!important;text-transform:uppercase!important}
+
+/* The on-screen .rt-table uses a dark "liquid glass" theme, but exported
+   images/PDFs (roster, berth plan, handover — all rendered inside a
+   .print-wrap) need to stay light and print-legible. This overrides the
+   dark theme ONLY inside .print-wrap, so the live screen view is untouched. */
+.print-wrap .rt-table{background:#ffffff!important;color:#111111!important;box-shadow:none!important;}
+.print-wrap .rt-table th,.print-wrap .rt-table td{border-color:#000!important;}
+.print-wrap .rt-table thead tr:first-child th.rt-title,.print-wrap .rt-table thead tr:first-child th.rt-team{background:#1f3b57!important;color:#fff!important;}
+.print-wrap .rt-table thead tr:nth-child(2) th{background:#7f8fa4!important;color:#fff!important;}
+.print-wrap .rt-table tbody td,.print-wrap .rt-table tbody tr:nth-child(even) td,.print-wrap .rt-table td.rt-team{background:#eef1f4!important;color:#111111!important;}
+.print-wrap .rt-table tbody tr:nth-child(odd) td{background:#ffffff!important;}
+.print-wrap .rt-table td.rt-crane{color:#155724!important;font-weight:800!important;}
 </style>
 </head>
 <body>
@@ -4924,10 +4936,22 @@ function captureElementCanvas(elementId, bgOverride){
   el.style.maxWidth = 'none';
   el.style.overflow = 'visible';
 
+  /* Large/wide content (long tables like the full roster) can push a fixed
+     high scale past what mobile browsers (iOS Safari in particular caps
+     canvases around 4096px per side) can actually render — past that limit
+     the canvas silently comes back blank/black instead of erroring. Scale
+     down just enough to stay safely under that ceiling, so quality is still
+     as high as possible without breaking the export. */
+  const MAX_CANVAS_DIMENSION = 4000;
+  const elHeight = Math.max(1, el.scrollHeight, el.getBoundingClientRect().height);
+  let scale = 6;
+  scale = Math.min(scale, MAX_CANVAS_DIMENSION/naturalWidth, MAX_CANVAS_DIMENSION/elHeight);
+  scale = Math.max(1.5, scale);
+
   return new Promise((resolve, reject)=>{
     requestAnimationFrame(()=>{
       html2canvas(el, {
-        scale: 6,               // very high resolution export (print-grade)
+        scale,                   // very high resolution export, capped to a safe canvas size
         useCORS: true,
         backgroundColor: bgOverride || null,
         windowWidth: Math.max(window.innerWidth, Math.ceil(naturalWidth) + 80),
