@@ -3000,6 +3000,7 @@ function viewHandover(){
   <div class="row" style="justify-content:space-between;margin-top:22px;margin-bottom:10px;">
     <h3 style="margin:0;">جدول التسليم المدمج (صورة واحدة تجمع المراكب والمشون)</h3>
     <button class="btn-gold btn-sm" onclick="shareHandoverTable()">📤 مشاركة صورة التسليم والمشون بالكامل</button>
+    <button class="btn-ghost btn-sm" onclick="shareHandoverTablePDF()">📄 PDF</button>
   </div>
   ${buildHandoverPrintBundleHTML()}
   `;
@@ -3706,6 +3707,9 @@ function buildHandoverPrintBundleHTML(){
 
 function shareHandoverTable(){
   shareElement('handoverTableCapture', `handover_summary_${todayStr()}.png`, '#ffffff');
+}
+function shareHandoverTablePDF(){
+  shareElementAsPDF('handoverTableCapture', `handover_summary_${todayStr()}.pdf`, '#ffffff');
 }
 
 /* ===================== REPORTS ===================== */
@@ -4895,10 +4899,21 @@ function downloadCanvas(canvas, filename){
   link.click();
   link.remove();
 }
+/* The generic top-bar share button captures whatever the current tab shows
+   on screen — great for most tabs, but Roster/Berth Plan/Handover mix live
+   editing forms in with their clean printable table. For those, route to
+   the same dedicated, professional export used by their own "share" buttons
+   instead of screenshotting the forms and inputs too. */
 function shareCurrent(){
+  if(currentTab==='roster'){ shareRosterTable(currentRosterDate()); return; }
+  if(currentTab==='pier'){ sharePierTable(); return; }
+  if(currentTab==='handover'){ shareHandoverTable(); return; }
   shareElement('captureArea', `roster_report_${todayStr()}.png`, '#08080A');
 }
 function shareCurrentPDF(){
+  if(currentTab==='roster'){ shareRosterTablePDF(currentRosterDate()); return; }
+  if(currentTab==='pier'){ sharePierTablePDF(); return; }
+  if(currentTab==='handover'){ shareHandoverTablePDF(); return; }
   shareElementAsPDF('captureArea', `roster_report_${todayStr()}.pdf`, '#08080A');
 }
 
