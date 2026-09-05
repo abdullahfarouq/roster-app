@@ -1,17 +1,11 @@
 <!DOCTYPE html>
-<html lang="en" dir="ltr">
+<html lang="en" dir="ltr" style="background:#050505;">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <title>Roster - نظام إدارة وتخطيط الموانئ</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <style>
 :root {
   /* الألوان الأساسية للخلفيات */
@@ -623,6 +617,16 @@ body{font-family:var(--font-ar),"Cairo","Noto Naskh Arabic","Geeza Pro",sans-ser
 .print-wrap .rt-table tbody tr:nth-child(odd) td{background:#ffffff!important;}
 .print-wrap .rt-table td.rt-crane{color:#155724!important;font-weight:800!important;}
 
+/* Mac-style table refinement: thin hairline row separators and soft
+   rounded corners instead of the old thick black grid-lines, for both the
+   on-screen table and the export/print version. */
+.rt-table{border:1px solid rgba(255,255,255,.10)!important;border-radius:20px!important;overflow:hidden!important;border-collapse:separate!important;border-spacing:0!important;box-shadow:0 20px 50px rgba(0,0,0,.35),inset 0 1px 0 rgba(255,255,255,.06)!important;}
+.rt-table th,.rt-table td{border:none!important;border-bottom:1px solid rgba(255,255,255,.07)!important;}
+.rt-table tbody tr:last-child td{border-bottom:none!important;}
+.print-wrap .rt-table{border:1px solid #e2e5e9!important;box-shadow:0 10px 30px rgba(0,0,0,.08)!important;}
+.print-wrap .rt-table th,.print-wrap .rt-table td{border:none!important;border-bottom:1px solid #e5e8eb!important;}
+.print-wrap .rt-table tbody tr:last-child td{border-bottom:none!important;}
+
 /* Neutralizes backdrop-filter everywhere for the brief moment of an
    image/PDF export — see captureElementCanvas() for why. */
 .exporting-capture, .exporting-capture *{
@@ -630,13 +634,18 @@ body{font-family:var(--font-ar),"Cairo","Noto Naskh Arabic","Geeza Pro",sans-ser
   -webkit-backdrop-filter:none!important;
 }
 </style>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script defer src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script defer src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 </head>
 <body>
 <div id="splash-screen" aria-hidden="true">
   <div class="af-splash-inner">
     <img class="af-splash-logo" src="af-logic-logo.png" alt="AF LOGIC">
     <div class="af-splash-name">AF LOGIC</div>
-    <div class="af-splash-tagline">SIMPLY BETTER LOGIC</div>
     <div class="af-splash-line"></div>
   </div>
 </div>
@@ -676,7 +685,7 @@ const I18N = {
     home:'Home', share:'Share as image',
     tab_crew:'Operations & Equipment', tab_pier:'Berth Plan', tab_roster:'Shift Schedule',
     tab_calendar:'Rotation Table', tab_leaves:'Leaves', tab_handover:'Handover', tab_settings:'Settings',
-    tab_holdplan:'Hold Plan', tab_kpi:'Performance & KPIs', tab_reports:'Activity Log', tab_yardmgmt:'Yard',
+    tab_holdplan:'Hold Plan', tab_kpi:'Performance & KPIs', tab_reports:'Activity Log', tab_yardmgmt:'Yard', tab_draftsurvey:'Draft Survey',
     login_title:'Sign in to save & sync your data', login_name:'Name', login_phone:'Phone (optional)',
     login_email:'Email (optional)', login_btn:'Sign in', login_hint:'Use the same name/phone from any device to retrieve your saved data.'
   },
@@ -684,7 +693,7 @@ const I18N = {
     home:'الرئيسية', share:'مشاركة كصورة',
     tab_crew:'التشغيل والمعدات', tab_pier:'خطة الأرصفة', tab_roster:'جدول الوردية',
     tab_calendar:'جدول المناوبات', tab_leaves:'الإجازات', tab_handover:'التسليم والتسلم', tab_settings:'الإعدادات',
-    tab_holdplan:'مخطط العنابر', tab_kpi:'الأداء والـ KPIs', tab_reports:'سجل العمليات', tab_yardmgmt:'اليارد',
+    tab_holdplan:'مخطط العنابر', tab_kpi:'الأداء والـ KPIs', tab_reports:'سجل العمليات', tab_yardmgmt:'اليارد', tab_draftsurvey:'سرفي الغاطس',
     login_title:'سجّل الدخول لحفظ ومزامنة بياناتك', login_name:'الاسم', login_phone:'رقم التليفون (اختياري)',
     login_email:'البريد الإلكتروني (اختياري)', login_btn:'دخول', login_hint:'استخدم نفس الاسم أو رقم التليفون من أي جهاز لاسترجاع بياناتك المحفوظة.'
   }
@@ -936,7 +945,6 @@ function renderLogin(){
       <div class="brand brand-stack" style="margin-bottom:18px;justify-content:center;">
         <img class="brand-logo" src="af-logic-logo.png" alt="AF LOGIC">
         <span class="brand-name">ROSTER</span>
-        <span class="brand-tagline">SIMPLY BETTER LOGIC</span>
       </div>
       <h2 style="text-align:center;color:var(--cream);font-weight:400;margin-bottom:20px;">${t('login_title')}</h2>
       <div class="field"><label>${t('login_name')}</label><input id="loginName" placeholder="${t('login_name')}"></div>
@@ -960,6 +968,7 @@ const TABS = [
   {id:'kpi', label:'الأداء والـ KPIs', icon:'📊'},
   {id:'yardmgmt', label:'اليارد', icon:'🏭'},
   {id:'reports', label:'سجل العمليات', icon:'🧾'},
+  {id:'draftsurvey', label:'سرفي الغاطس', icon:'⚓'},
   {id:'settings', label:'الإعدادات', icon:'⚙️'},
 ];
 
@@ -973,7 +982,6 @@ function render(){
       <div class="brand brand-stack brand-header" style="cursor:pointer;" onclick="switchTab('home')">
         <img class="brand-logo" src="af-logic-logo.png" alt="AF LOGIC">
         <span class="brand-name">ROSTER</span>
-        <span class="brand-tagline">SIMPLY BETTER LOGIC</span>
       </div>
       <div class="row" style="gap:10px;">
         <span class="muted">${esc(state.name)}</span>
@@ -1009,6 +1017,7 @@ function renderTab(){
   else if(currentTab==='kpi') c.innerHTML = viewKPI();
   else if(currentTab==='yardmgmt') c.innerHTML = viewYardMgmt();
   else if(currentTab==='reports') c.innerHTML = viewReports();
+  else if(currentTab==='draftsurvey') c.innerHTML = viewDraftSurvey();
   else if(currentTab==='settings') c.innerHTML = viewSettings();
   bindTabEvents();
   applyDynamicTableSizing();
@@ -4497,7 +4506,7 @@ function renderKPIExport(){
 function sheetWithBrandHeader(rows, ar){
   const ws = XLSX.utils.json_to_sheet(rows, {origin:'A3'});
   XLSX.utils.sheet_add_aoa(ws, [
-    ['AF Logic — Simply Better Logic'],
+    ['AF Logic'],
     [`${ar?'تاريخ التصدير':'Exported'}: ${new Date().toLocaleString('en-GB')}`]
   ], {origin:'A1'});
   const colCount = rows.length ? Object.keys(rows[0]).length : 1;
@@ -4800,6 +4809,184 @@ function bindReportsSearch(){
 }
 
 /* ===================== SETTINGS ===================== */
+/* ===================== DRAFT SURVEY (ESTIMATE) ===================== */
+/* No two ships share hydrostatic tables, and this fleet spans many types/
+   sizes with no ship-specific data on file — so this uses the standard
+   "block coefficient" method (LBP × Beam × mean draft × Cb × density),
+   the accepted way to estimate displacement without a hydrostatic table.
+   It is NOT a substitute for a certified draft survey report; typical
+   accuracy is roughly ±3–7% depending on how close the entered block
+   coefficient is to the real ship. Every figure can be edited manually. */
+const SHIP_TYPES_DS = [
+  {id:'tanker',    ar:'ناقلة',                 en:'Tanker',          cb:0.82},
+  {id:'bulk',      ar:'سفينة بضائع صب جاف',     en:'Bulk carrier',    cb:0.82},
+  {id:'general',   ar:'بضائع عامة',             en:'General cargo',   cb:0.70},
+  {id:'container', ar:'حاويات',                 en:'Container ship',  cb:0.65},
+  {id:'roro',      ar:'رورو',                   en:'RoRo',            cb:0.60},
+  {id:'other',     ar:'أخرى (تحديد يدوي)',      en:'Other (manual)',  cb:0.70}
+];
+function ensureDraftSurveys(){ if(!state.draftSurveys) state.draftSurveys = []; }
+function computeDraftSurvey(d){
+  const meanFwd = (d.fwdP + d.fwdS)/2;
+  const meanMid = (d.midP + d.midS)/2;
+  const meanAft = (d.aftP + d.aftS)/2;
+  const trim = meanAft - meanFwd;
+  const quarterMean = (meanFwd + meanAft + 6*meanMid)/8; // Mean of Means — standard quarter-mean draft
+  const displacement = d.lbp * d.beam * quarterMean * d.cb * d.density;
+  return { meanFwd, meanMid, meanAft, trim, quarterMean, displacement };
+}
+function dsShipTypeChanged(sel){
+  const t = SHIP_TYPES_DS.find(x=>x.id===sel.value);
+  const cbInput = document.getElementById('dsCb');
+  if(t && cbInput) cbInput.value = t.cb;
+}
+function viewDraftSurvey(){
+  ensureDraftSurveys();
+  const ar = currentLang()==='ar';
+  const surveys = state.draftSurveys;
+  return `
+  <div id="captureArea">
+  <h1>⚓ ${ar?'سرفي الغاطس (تقديري)':'Draft Survey (estimate)'}</h1>
+  <div class="notice" style="margin-bottom:16px;">
+    ⚠️ ${ar?'ده حساب تقديري بمعادلة "معامل الامتلاء" العالمية (من غير جداول هيدروستاتيك خاصة بالسفينة)، دقته التقريبية ±3–7% حسب دقة معامل الامتلاء المُدخل. مش بديل عن تقرير Draft Survey رسمي معتمد. كل رقم قابل للتعديل اليدوي.'
+      :'This is an estimate using the standard block-coefficient method (no ship-specific hydrostatic tables), typically accurate to within ±3–7% depending on how accurate the entered block coefficient is. It is not a substitute for a certified official Draft Survey report. Every figure can be edited manually.'}
+  </div>
+
+  <div class="card" style="margin-bottom:16px;">
+    <h3>${ar?'تسجيل قراءة جديدة':'Log a new reading'}</h3>
+    <div class="g2">
+      <div class="field"><label>${ar?'اسم السفينة':'Vessel name'}</label><input id="dsVessel" placeholder="${ar?'اسم المركب':'Vessel name'}"></div>
+      <div class="field"><label>${ar?'التاريخ والوقت':'Date & time'}</label><input id="dsDateTime" type="datetime-local" value="${new Date().toISOString().slice(0,16)}"></div>
+      <div class="field"><label>${ar?'نوع السفينة (لتقدير معامل الامتلاء)':'Ship type (estimates block coefficient)'}</label>
+        <select id="dsShipType" onchange="dsShipTypeChanged(this)">
+          ${SHIP_TYPES_DS.map(t=>`<option value="${t.id}">${ar?t.ar:t.en} (Cb ≈ ${t.cb})</option>`).join('')}
+        </select>
+      </div>
+      <div class="field"><label>${ar?'معامل الامتلاء Cb (قابل للتعديل)':'Block coefficient Cb (editable)'}</label>
+        <input id="dsCb" type="number" min="0.4" max="0.95" step="0.01" value="0.82">
+      </div>
+      <div class="field"><label>${ar?'الطول بين العمودين LBP (متر)':'Length between perpendiculars — LBP (m)'}</label>
+        <input id="dsLbp" type="number" min="0" step="0.1" placeholder="${ar?'مثال: 180':'e.g. 180'}">
+      </div>
+      <div class="field"><label>${ar?'العرض Beam (متر)':'Beam (m)'}</label>
+        <input id="dsBeam" type="number" min="0" step="0.1" placeholder="${ar?'مثال: 28':'e.g. 28'}">
+      </div>
+      <div class="field"><label>${ar?'كثافة المياه (طن/م³)':'Water density (t/m³)'}</label>
+        <select id="dsDensity">
+          <option value="1.025">${ar?'مياه بحر (1.025)':'Sea water (1.025)'}</option>
+          <option value="1.010">${ar?'مياه شبه مالحة (1.010)':'Brackish water (1.010)'}</option>
+          <option value="1.000">${ar?'مياه نهر/عذبة (1.000)':'Fresh/river water (1.000)'}</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="divider"></div>
+    <div class="muted" style="margin-bottom:6px;">${ar?'قراءات الغاطس الستة (متر)':'The six draft readings (m)'}</div>
+    <div class="g3">
+      <div class="field"><label>${ar?'قدام يمين (Fwd Stbd)':'Fwd Starboard'}</label><input id="dsFwdS" type="number" step="0.001" placeholder="0.000"></div>
+      <div class="field"><label>${ar?'قدام يسار (Fwd Port)':'Fwd Port'}</label><input id="dsFwdP" type="number" step="0.001" placeholder="0.000"></div>
+      <div class="field"><label>${ar?'وسط يمين (Mid Stbd)':'Mid Starboard'}</label><input id="dsMidS" type="number" step="0.001" placeholder="0.000"></div>
+      <div class="field"><label>${ar?'وسط يسار (Mid Port)':'Mid Port'}</label><input id="dsMidP" type="number" step="0.001" placeholder="0.000"></div>
+      <div class="field"><label>${ar?'خلف يمين (Aft Stbd)':'Aft Starboard'}</label><input id="dsAftS" type="number" step="0.001" placeholder="0.000"></div>
+      <div class="field"><label>${ar?'خلف يسار (Aft Port)':'Aft Port'}</label><input id="dsAftP" type="number" step="0.001" placeholder="0.000"></div>
+    </div>
+    <div class="field" style="margin-top:10px;"><label>${ar?'ملاحظة':'Note'}</label><input id="dsNote" placeholder="${ar?'مثال: قبل بدء التفريغ':'e.g. Before discharge started'}"></div>
+    <button class="btn-gold" style="width:100%;margin-top:10px;" onclick="saveDraftSurvey()">💾 ${ar?'حفظ القراءة':'Save reading'}</button>
+  </div>
+
+  ${surveys.length>=2 ? renderDraftSurveyCompare(surveys, ar) : ''}
+
+  <div class="card">
+    <h3>📋 ${ar?'القراءات المحفوظة':'Saved readings'}</h3>
+    ${renderDraftSurveyList(surveys, ar)}
+  </div>
+  </div>`;
+}
+function saveDraftSurvey(){
+  ensureDraftSurveys();
+  const ar = currentLang()==='ar';
+  const vessel = document.getElementById('dsVessel').value.trim();
+  const lbp = parseFloat(document.getElementById('dsLbp').value)||0;
+  const beam = parseFloat(document.getElementById('dsBeam').value)||0;
+  const cb = parseFloat(document.getElementById('dsCb').value)||0.7;
+  const density = parseFloat(document.getElementById('dsDensity').value)||1.025;
+  const d = {
+    fwdP: parseFloat(document.getElementById('dsFwdP').value)||0,
+    fwdS: parseFloat(document.getElementById('dsFwdS').value)||0,
+    midP: parseFloat(document.getElementById('dsMidP').value)||0,
+    midS: parseFloat(document.getElementById('dsMidS').value)||0,
+    aftP: parseFloat(document.getElementById('dsAftP').value)||0,
+    aftS: parseFloat(document.getElementById('dsAftS').value)||0,
+    lbp, beam, cb, density
+  };
+  if(!vessel || !lbp || !beam){ alert(ar?'من فضلك أدخل اسم السفينة والطول والعرض':'Please enter the vessel name, LBP and beam'); return; }
+  if(!d.fwdP && !d.fwdS && !d.aftP && !d.aftS){ alert(ar?'من فضلك أدخل قراءات الغاطس':'Please enter the draft readings'); return; }
+  const computed = computeDraftSurvey(d);
+  const entry = {
+    id: uid(), createdAt: new Date().toISOString(),
+    vesselName: vessel, date: document.getElementById('dsDateTime').value,
+    shipTypeId: document.getElementById('dsShipType').value,
+    drafts: d, computed, note: document.getElementById('dsNote').value.trim(), user: state.name
+  };
+  state.draftSurveys.unshift(entry);
+  log('سرفي الغاطس','حفظ قراءة',null,{vessel, displacement: Math.round(computed.displacement)});
+  saveState(); renderTab();
+}
+function deleteDraftSurvey(id){
+  const ar = currentLang()==='ar';
+  if(!confirm(ar?'حذف هذه القراءة؟':'Delete this reading?')) return;
+  state.draftSurveys = state.draftSurveys.filter(s=>s.id!==id);
+  saveState(); renderTab();
+}
+function renderDraftSurveyList(surveys, ar){
+  if(!surveys.length) return `<div class="empty muted">${ar?'لا توجد قراءات محفوظة بعد':'No readings saved yet'}</div>`;
+  return surveys.map(s=>`
+    <div class="list-item">
+      <div>
+        <div class="row"><b style="color:var(--gold);">${esc(s.vesselName)}</b> — <span class="muted">${esc(new Date(s.date).toLocaleString(ar?'ar-EG':'en-GB'))}</span></div>
+        <div class="muted">${ar?'غاطس متوسط':'Mean draft'}: ${s.computed.quarterMean.toFixed(3)}m · ${ar?'ميل':'Trim'}: ${s.computed.trim.toFixed(3)}m · ${ar?'الإزاحة التقديرية':'Est. displacement'}: <b>${Math.round(s.computed.displacement).toLocaleString()} ${ar?'طن':'t'}</b>${s.note?(' · '+esc(s.note)):''}</div>
+      </div>
+      <button class="btn-danger btn-sm" onclick="deleteDraftSurvey('${esc(s.id)}')">🗑️</button>
+    </div>`).join('');
+}
+function renderDraftSurveyCompare(surveys, ar){
+  return `
+  <div class="card" style="margin-bottom:16px;border-color:rgba(232,185,63,.35);">
+    <h3>⚖️ ${ar?'مقارنة قراءتين — لحساب كمية البضاعة':'Compare two readings — to get the cargo quantity'}</h3>
+    <div class="g2">
+      <div class="field"><label>${ar?'القراءة الأولى (قبل)':'First reading (before)'}</label>
+        <select id="dsCompareA">${surveys.map((s,i)=>`<option value="${i}">${esc(s.vesselName)} — ${esc(new Date(s.date).toLocaleString(ar?'ar-EG':'en-GB'))}</option>`).join('')}</select>
+      </div>
+      <div class="field"><label>${ar?'القراءة الثانية (بعد)':'Second reading (after)'}</label>
+        <select id="dsCompareB">${surveys.map((s,i)=>`<option value="${i}" ${i===0?'selected':''}>${esc(s.vesselName)} — ${esc(new Date(s.date).toLocaleString(ar?'ar-EG':'en-GB'))}</option>`).join('')}</select>
+      </div>
+      <div class="field"><label>${ar?'تعديل يدوي (+/- بنكر، مياه، بالاست) طن':'Manual adjustment (+/- bunkers, water, ballast) tons'}</label>
+        <input id="dsManualAdj" type="number" step="1" value="0">
+      </div>
+    </div>
+    <button class="btn-ghost btn-sm" onclick="renderDraftSurveyResult()">${ar?'احسب':'Calculate'}</button>
+    <div id="dsCompareResult" style="margin-top:12px;"></div>
+  </div>`;
+}
+function renderDraftSurveyResult(){
+  const ar = currentLang()==='ar';
+  const surveys = state.draftSurveys;
+  const iA = parseInt(document.getElementById('dsCompareA').value);
+  const iB = parseInt(document.getElementById('dsCompareB').value);
+  const adj = parseFloat(document.getElementById('dsManualAdj').value)||0;
+  const a = surveys[iA], b = surveys[iB];
+  const box = document.getElementById('dsCompareResult');
+  if(!a || !b || a===b){ box.innerHTML = `<div class="muted">${ar?'اختر قراءتين مختلفتين':'Pick two different readings'}</div>`; return; }
+  const rawDelta = b.computed.displacement - a.computed.displacement;
+  const net = rawDelta + adj;
+  const direction = net>=0 ? (ar?'تم تحميل':'Loaded') : (ar?'تم تفريغ':'Discharged');
+  box.innerHTML = `
+    <div class="notice">
+      📦 ${direction}: <b>${Math.abs(net).toLocaleString(undefined,{maximumFractionDigits:0})} ${ar?'طن (تقديري)':'tons (estimated)'}</b><br>
+      <span class="muted">${ar?'الفرق الخام بين القراءتين':'Raw difference between readings'}: ${Math.round(rawDelta).toLocaleString()} ${ar?'طن':'t'} ${adj?(ar?' + تعديل يدوي: ':' + manual adjustment: ')+adj.toLocaleString()+(ar?' طن':' t'):''}</span>
+    </div>`;
+}
+
 function viewSettings(){
   const l = currentLang();
   const ar = l==='ar';
@@ -5023,7 +5210,7 @@ function composeWithLogo(sourceCanvas, bgOverride){
       ctx.textBaseline = 'top';
       ctx.fillStyle = isDark ? '#9aa4b5' : '#5a5a5a';
       ctx.font = `600 ${Math.round(topBandH*0.13)}px Arial, sans-serif`;
-      ctx.fillText('Simply Better Logic', logoX + logoW/2, logoY + logoH + topBandH*0.08);
+      ctx.fillText('AF Logic', logoX + logoW/2, logoY + logoH + topBandH*0.08);
 
       // --- Captured content ---
       ctx.drawImage(sourceCanvas, 0, topBandH);
@@ -5144,7 +5331,23 @@ function hideAFSplash(){
   splash.classList.add('af-hide');
   setTimeout(()=>splash.remove(), 900);
 }
-setTimeout(hideAFSplash, 1900);
+/* Wait for the actual app content, not a blind timer — a slow network or
+   device could otherwise reveal an unstyled/blank gap before the splash's
+   own minimum fade time is up. Still enforce a small minimum so the splash
+   doesn't just flicker away instantly on a fast load. */
+function scheduleHideAFSplash(){
+  const minShow = 1200;
+  const start = Date.now();
+  function tryHide(){
+    const app = document.getElementById('app');
+    const ready = app && app.children && app.children.length>0;
+    const elapsed = Date.now()-start;
+    if(ready && elapsed>=minShow){ hideAFSplash(); }
+    else if(ready){ setTimeout(hideAFSplash, minShow-elapsed); }
+    else { setTimeout(tryHide, 60); }
+  }
+  tryHide();
+}
 
 window.onload = function(){
   const savedLang = localStorage.getItem('roster_lang') || 'en';
@@ -5152,6 +5355,7 @@ window.onload = function(){
   document.documentElement.setAttribute('dir', savedLang==='ar'?'rtl':'ltr');
   checkAutoLogin();
   render();
+  scheduleHideAFSplash();
 };
 </script>
 </body>
