@@ -208,6 +208,9 @@ th{color:var(--gold);font-weight:700;}
 .chip-toggle:hover{border-color:var(--gold);}
 .chip-toggle.active{background:var(--gold);color:#111;font-weight:700;border-color:var(--gold);}
 .holdplan-controls{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:12px;margin-top:14px;}
+.stats-mini-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;margin-top:8px;}
+.stat-mini{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:10px 14px;display:flex;flex-direction:column;gap:4px;}
+.stat-mini b{font-size:1.15rem;}
 .holdplan-hold-card{border:1px solid var(--border);border-radius:14px;padding:12px;background:rgba(255,255,255,0.03);}
 .holdplan-hold-card.done{border-color:#2fae63;background:rgba(47,174,99,0.1);}
 .holdplan-hold-card b{display:block;margin-bottom:6px;color:var(--gold);}
@@ -3426,11 +3429,127 @@ function renderHoldPlanEntries(){
         `).join('')}
       </div>
 
+      ${renderDischargeTracking(p)}
+
       <div id="holdPlanCapture-${p.id}" class="print-wrap" style="margin-top:16px;overflow-x:auto;background:#0b1220;padding:10px;border-radius:12px;">
         <div id="holdPlanSvg-${p.id}">${buildVesselSVG(p)}</div>
       </div>
     </div>
   `).join('');
+}
+
+/* ===================== SHIP-WIDE DISCHARGE TRACKING ===================== */
+/* Below the threshold, a hold needs a loader to physically enter and scrape
+   the remaining cargo together — real work that's slower than normal crane
+   picks — so we pad the ETA for any hold that's this close to empty. */
+const NEAR_EMPTY_THRESHOLD_TONS = 5000;
+const NEAR_EMPTY_EXTRA_HOURS = 4; // per hold below threshold — adjustable estimate
+
+function ensureDischargeTracking(p){
+  if(p.totalCargoTons===undefined) p.totalCargoTons = '';
+  if(!p.dischargeLog) p.dischargeLog = [];
+}
+function formatHoursDuration(hours){
+  if(!isFinite(hours) || hours<=0) return '—';
+  const totalMinutes = Math.round(hours*60);
+  const d = Math.floor(totalMinutes/1440);
+  const h = Math.floor((totalMinutes%1440)/60);
+  const m = totalMinutes%60;
+  const parts = [];
+  if(d>0) parts.push(`${d} يوم`);
+  if(h>0) parts.push(`${h} ساعة`);
+  if(m>0 && d===0) parts.push(`${m} دقيقة`);
+  return parts.length ? parts.join(' و ') : '< دقيقة';
+}
+function computeDischargeSummary(p){
+  const total = parseFloat(p.totalCargoTons)||0;
+  const log = p.dischargeLog||[];
+  const totalDischarged = log.reduce((s,e)=>s+(parseFloat(e.tons)||0),0);
+  const remaining = Math.max(0, total - totalDischarged);
+  const last = log.length ? log[0] : null; // newest entry kept at index 0
+  const lastRate = (last && parseFloat(last.hours)>0) ? (parseFloat(last.tons)/parseFloat(last.hours)) : 0;
+  const nearEmptyHolds = (p.holds||[]).filter(h=>{
+    const q = parseFloat(h.qty)||0;
+    return q>0 && q<=NEAR_EMPTY_THRESHOLD_TONS && !h.done;
+  });
+  const extraHours = nearEmptyHolds.length * NEAR_EMPTY_EXTRA_HOURS;
+  const baseEtaHours = lastRate>0 ? (remaining/lastRate) : 0;
+  const etaHours = baseEtaHours>0 ? baseEtaHours + extraHours : 0;
+  return { total, totalDischarged, remaining, lastRate, nearEmptyHolds, extraHours, baseEtaHours, etaHours };
+}
+function renderDischargeTracking(p){
+  ensureDischargeTracking(p);
+  const s = computeDischargeSummary(p);
+  return `
+  <div class="card" style="margin-top:16px;border-color:rgba(232,185,63,.35);">
+    <h3>📊 متابعة تفريغ المركب — الإجمالي والوقت المتبقي</h3>
+    <div class="field" style="max-width:280px;">
+      <label>إجمالي حمولة المركب (طن) — تُكتب مرة واحدة</label>
+      <input type="number" min="0" value="${esc(p.totalCargoTons||'')}" placeholder="مثال: 55000" onchange="setPlanTotalCargo('${esc(p.id)}',this.value)">
+    </div>
+
+    <div class="divider"></div>
+    <div class="row" style="justify-content:space-between;">
+      <h4 style="margin:0;">تسجيل دوري لكمية التفريغ (كل 12 ساعة مثلاً)</h4>
+    </div>
+    <div class="g3" style="align-items:flex-end;margin-top:8px;">
+      <div class="field" style="margin-bottom:0;"><label>عدد الساعات لهذه الفترة</label>
+        <input id="dlHours-${esc(p.id)}" type="number" min="0.5" step="0.5" value="12">
+      </div>
+      <div class="field" style="margin-bottom:0;"><label>الكمية اللي اتفرغت في الفترة دي (طن)</label>
+        <input id="dlTons-${esc(p.id)}" type="number" min="0" placeholder="مثال: 4200">
+      </div>
+      <button class="btn-gold btn-sm" style="height:42px;" onclick="addDischargeLogEntry('${esc(p.id)}')">+ تسجيل</button>
+    </div>
+
+    ${s.total>0 ? `
+    <div class="divider"></div>
+    <div class="stats-mini-grid">
+      <div class="stat-mini"><span class="muted">إجمالي الحمولة</span><b>${s.total.toLocaleString()} طن</b></div>
+      <div class="stat-mini"><span class="muted">إجمالي المُفرَّغ</span><b>${s.totalDischarged.toLocaleString()} طن</b></div>
+      <div class="stat-mini"><span class="muted">الباقي على المركب</span><b style="color:var(--gold);">${s.remaining.toLocaleString()} طن</b></div>
+      <div class="stat-mini"><span class="muted">معدل آخر فترة</span><b>${s.lastRate ? s.lastRate.toFixed(0)+' طن/ساعة' : '—'}</b></div>
+    </div>
+    <div class="notice" style="margin-top:10px;">
+      ⏳ الوقت المتبقي التقريبي للانتهاء الكامل: <b>${formatHoursDuration(s.etaHours)}</b>
+      ${s.nearEmptyHolds.length ? `<br>🚜 ${s.nearEmptyHolds.length} عنبر قرّب يخلص (أقل من ${NEAR_EMPTY_THRESHOLD_TONS.toLocaleString()} طن) ومحتاج لودر يدخل يلمّ الباقي — مضاف بسبب كده ${s.extraHours} ساعة تقريبًا فوق المعدل العادي.` : ''}
+    </div>` : `<div class="muted" style="margin-top:10px;">اكتب إجمالي حمولة المركب فوق عشان يبدأ يحسبلك الباقي والوقت المتوقع.</div>`}
+
+    ${p.dischargeLog.length ? `
+    <div class="divider"></div>
+    <div class="muted" style="margin-bottom:6px;">سجل التسجيلات الدورية</div>
+    ${p.dischargeLog.map(e=>`
+      <div class="list-item">
+        <div>${esc(e.date)} — <b>${e.tons.toLocaleString()} طن</b> في ${e.hours} ساعة (${(e.tons/e.hours).toFixed(0)} طن/ساعة)</div>
+        <button class="btn-danger btn-sm" onclick="deleteDischargeLogEntry('${esc(p.id)}','${esc(e.id)}')">🗑️</button>
+      </div>`).join('')}
+    ` : ''}
+  </div>`;
+}
+function setPlanTotalCargo(planId, value){
+  const p = state.holdPlans.find(x=>x.id===planId);
+  if(!p) return;
+  p.totalCargoTons = value;
+  log('مخطط عنابر','تحديث إجمالي الحمولة',null,{plan:p.name, total:value});
+  saveState(); renderTab();
+}
+function addDischargeLogEntry(planId){
+  const p = state.holdPlans.find(x=>x.id===planId);
+  if(!p) return;
+  ensureDischargeTracking(p);
+  const hours = parseFloat(document.getElementById(`dlHours-${planId}`).value)||0;
+  const tons = parseFloat(document.getElementById(`dlTons-${planId}`).value)||0;
+  if(hours<=0 || tons<=0){ alert('من فضلك أدخل عدد الساعات والكمية بشكل صحيح'); return; }
+  p.dischargeLog.unshift({ id: uid(), date: new Date().toLocaleString('ar-EG'), hours, tons });
+  log('مخطط عنابر','تسجيل تفريغ دوري',null,{plan:p.name, hours, tons});
+  saveState(); renderTab();
+}
+function deleteDischargeLogEntry(planId, entryId){
+  const p = state.holdPlans.find(x=>x.id===planId);
+  if(!p) return;
+  if(!confirm('حذف هذا التسجيل؟')) return;
+  p.dischargeLog = p.dischargeLog.filter(e=>e.id!==entryId);
+  saveState(); renderTab();
 }
 
 /* Builds a schematic side-view of the vessel with N holds, numbered 1 (bow, right)
