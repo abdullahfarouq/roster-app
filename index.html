@@ -622,6 +622,13 @@ body{font-family:var(--font-ar),"Cairo","Noto Naskh Arabic","Geeza Pro",sans-ser
 .print-wrap .rt-table tbody td,.print-wrap .rt-table tbody tr:nth-child(even) td,.print-wrap .rt-table td.rt-team{background:#eef1f4!important;color:#111111!important;}
 .print-wrap .rt-table tbody tr:nth-child(odd) td{background:#ffffff!important;}
 .print-wrap .rt-table td.rt-crane{color:#155724!important;font-weight:800!important;}
+
+/* Neutralizes backdrop-filter everywhere for the brief moment of an
+   image/PDF export — see captureElementCanvas() for why. */
+.exporting-capture, .exporting-capture *{
+  backdrop-filter:none!important;
+  -webkit-backdrop-filter:none!important;
+}
 </style>
 </head>
 <body>
@@ -4936,6 +4943,13 @@ function captureElementCanvas(elementId, bgOverride){
   el.style.maxWidth = 'none';
   el.style.overflow = 'visible';
 
+  /* html2canvas cannot render backdrop-filter (used all over this app's
+     "glass" look — .card, .glass, etc.) and, in this version, sometimes
+     turns the ENTIRE captured canvas solid black when it encounters it
+     anywhere in the page — not just on the captured element itself. Strip
+     it everywhere for the moment of capture, then restore it immediately. */
+  document.body.classList.add('exporting-capture');
+
   /* Large/wide content (long tables like the full roster) can push a fixed
      high scale past what mobile browsers (iOS Safari in particular caps
      canvases around 4096px per side) can actually render — past that limit
@@ -4948,27 +4962,29 @@ function captureElementCanvas(elementId, bgOverride){
   scale = Math.min(scale, MAX_CANVAS_DIMENSION/naturalWidth, MAX_CANVAS_DIMENSION/elHeight);
   scale = Math.max(1.5, scale);
 
+  function restore(){
+    el.style.background = originalBackground;
+    el.style.width = originalWidth;
+    el.style.maxWidth = originalMaxWidth;
+    el.style.overflow = originalOverflow;
+    document.body.classList.remove('exporting-capture');
+  }
+
   return new Promise((resolve, reject)=>{
     requestAnimationFrame(()=>{
       html2canvas(el, {
         scale,                   // very high resolution export, capped to a safe canvas size
         useCORS: true,
-        backgroundColor: bgOverride || null,
+        backgroundColor: bgOverride || '#ffffff',
         windowWidth: Math.max(window.innerWidth, Math.ceil(naturalWidth) + 80),
         scrollX: 0,
         scrollY: -window.scrollY,
         logging: false
       }).then(canvas=>{
-        el.style.background = originalBackground;
-        el.style.width = originalWidth;
-        el.style.maxWidth = originalMaxWidth;
-        el.style.overflow = originalOverflow;
+        restore();
         composeWithLogo(canvas, bgOverride).then(resolve);
       }).catch(err=>{
-        el.style.background = originalBackground;
-        el.style.width = originalWidth;
-        el.style.maxWidth = originalMaxWidth;
-        el.style.overflow = originalOverflow;
+        restore();
         reject(err);
       });
     });
