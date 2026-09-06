@@ -2734,7 +2734,11 @@ function aiGenerateRoster(date){
   }
 }
 
-/* ===================== ROTATION CALENDAR (متوافق حتى 2050 بناءً على نطاق 3 أشهر يوليو-سبتمبر 2026) ===================== */
+/* ===================== ROTATION CALENDAR (permanent, endless 8-day cycle) =====================
+   Verified against the reference schedule (Jan 2026 – Jan 2027): the cycle
+   is a fixed 8-day block — 4 days off, 2 day-shifts, 2 night-shifts — that
+   never resets, anchored to Jan 1, 2026. Each shift just starts at a
+   different point in that same 8-day block. */
 function getShiftTypeForDate(dateObj, shiftNum) {
     if (!(dateObj instanceof Date) || isNaN(dateObj.getTime())) {
         return 'O';
@@ -2743,19 +2747,19 @@ function getShiftTypeForDate(dateObj, shiftNum) {
     const currentDate = new Date(dateObj);
     currentDate.setHours(0, 0, 0, 0);
 
-    const referenceDate = new Date(2026, 6, 1);
+    const referenceDate = new Date(2026, 0, 1); // Thu Jan 1, 2026 — verified anchor day
     referenceDate.setHours(0, 0, 0, 0);
 
     const diffDays = Math.floor((currentDate.getTime() - referenceDate.getTime()) / 86400000);
 
-    // النمط المتسلسل المعتمد بناءً على الـ 3 أشهر الأولى (يوليو، أغسطس، سبتمبر 2026)
-    const pattern = ['D', 'D', 'N', 'N', 'O', 'O', 'O', 'O'];
+    // 8-day block verified against the reference schedule, starting at the anchor date.
+    const pattern = ['O', 'O', 'O', 'O', 'D', 'D', 'N', 'N'];
 
     const offsets = {
         1: 0,
         2: 4,
         3: 6,
-        4: 2 
+        4: 2
     };
 
     const offset = offsets[shiftNum] ?? 0;
@@ -2768,6 +2772,90 @@ function getShiftTypeForDate(dateObj, shiftNum) {
     return pattern[index];
 }
 
+/* ===================== EGYPT HOLIDAYS (auto-generated, endless) =====================
+   Fixed-date national holidays and Sham El Nessim (tied to Orthodox/Coptic
+   Easter) are calculated exactly for any year. Islamic (Hijri) holidays —
+   Ramadan, Eid al-Fitr, Eid al-Adha, Islamic New Year, Prophet's birthday —
+   are calculated using the standard tabular Islamic calendar, which is an
+   ESTIMATE typically accurate to within a day or two of the real date;
+   Egypt's actual Islamic holidays are only confirmed a little in advance by
+   official moon-sighting, so these are marked "تقديري" (estimated). */
+function julianDayToGregorian(jdn){
+  const a = jdn + 32044;
+  const b = Math.floor((4*a+3)/146097);
+  const c = a - Math.floor((146097*b)/4);
+  const d = Math.floor((4*c+3)/1461);
+  const e = c - Math.floor((1461*d)/4);
+  const m = Math.floor((5*e+2)/153);
+  const day = e - Math.floor((153*m+2)/5) + 1;
+  const month = m + 3 - 12*Math.floor(m/10);
+  const year = 100*b + d - 4800 + Math.floor(m/10);
+  return new Date(year, month-1, day);
+}
+function islamicToGregorian(iy, im, id){
+  const jdn = id + Math.ceil(29.5*(im-1)) + (iy-1)*354 + Math.floor((3+11*iy)/30) + 1948440 - 1;
+  return julianDayToGregorian(jdn);
+}
+function addDaysToDate(d, n){ const r = new Date(d); r.setDate(r.getDate()+n); return r; }
+function dstr(d){ return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
+
+/* Julian-calendar (Orthodox/Coptic) Easter, converted to a Gregorian date —
+   Sham El Nessim in Egypt is the Monday right after this Easter. */
+function orthodoxEasterGregorian(year){
+  const a = year % 4, b = year % 7, c = year % 19;
+  const d = (19*c + 15) % 30, e = (2*a + 4*b - d + 34) % 7;
+  const month = Math.floor((d + e + 114) / 31); // 3=March, 4=April (Julian)
+  const day = ((d + e + 114) % 31) + 1;
+  // Julian date -> Gregorian: add the Julian/Gregorian offset (13 days for 1900–2099, 14 for 2100–2199, etc.)
+  const julianDate = new Date(year, month-1, day);
+  const offset = year<2100 ? 13 : (year<2200 ? 14 : 15);
+  return addDaysToDate(julianDate, offset);
+}
+
+let _egyptHolidaysCache = null;
+function getEgyptHolidays(){
+  if(_egyptHolidaysCache) return _egyptHolidaysCache;
+  const map = {};
+  const add = (date, label, cls)=>{ const k=dstr(date); if(!map[k]) map[k]=[]; map[k].push({label,cls}); };
+
+  for(let y=2025; y<=2127; y++){
+    // Fixed national holidays (exact, every year)
+    add(new Date(y,0,25), 'عيد الشرطة / ثورة 25 يناير', 'nat');
+    add(new Date(y,3,25), 'عيد تحرير سيناء', 'nat');
+    add(new Date(y,4,1),  'عيد العمال', 'nat');
+    add(new Date(y,5,30), 'ثورة 30 يونيو', 'nat');
+    add(new Date(y,6,23), 'عيد ثورة 23 يوليو', 'nat');
+    add(new Date(y,9,6),  'عيد القوات المسلحة (نصر أكتوبر)', 'nat');
+    // Sham El Nessim — Monday after Coptic/Orthodox Easter
+    const orthEaster = orthodoxEasterGregorian(y);
+    add(addDaysToDate(orthEaster,1), 'شم النسيم', 'nessim');
+  }
+
+  // Islamic (Hijri) holidays — tabular calendar estimate, covers roughly AH 1446–1553
+  for(let hy=1446; hy<=1553; hy++){
+    const ramadanStart = islamicToGregorian(hy, 9, 1);
+    add(ramadanStart, 'استهلال شهر رمضان المبارك (تقديري)', 'isl');
+    const eidFitr = islamicToGregorian(hy, 10, 1);
+    for(let i=0;i<3;i++) add(addDaysToDate(eidFitr,i), 'عيد الفطر المبارك (تقديري)', 'isl');
+    const eidAdha = islamicToGregorian(hy, 12, 10);
+    for(let i=0;i<4;i++) add(addDaysToDate(eidAdha,i), 'عيد الأضحى المبارك (تقديري)', 'isl');
+    const hijriNewYear = islamicToGregorian(hy, 1, 1);
+    add(hijriNewYear, 'رأس السنة الهجرية (تقديري)', 'isl');
+    const mawlid = islamicToGregorian(hy, 3, 12);
+    add(mawlid, 'المولد النبوي الشريف (تقديري)', 'isl');
+  }
+
+  _egyptHolidaysCache = map;
+  return map;
+}
+/* Back-compat shape for older call sites expecting {dateStr: "label string"}. */
+function getEgyptHolidaysFlat(){
+  const full = getEgyptHolidays();
+  const flat = {};
+  Object.keys(full).forEach(k=> flat[k] = full[k].map(h=>h.label).join(' / '));
+  return flat;
+}
+
 let calViewMode = 'monthly';
 let calSelectedShift = 'all';
 let calTargetDate = new Date();
@@ -2775,7 +2863,7 @@ let calTargetDate = new Date();
 function viewCalendar(){
   const y = calTargetDate.getFullYear();
   const m = calTargetDate.getMonth();
-  const holidays = {}; 
+  const holidays = getEgyptHolidaysFlat();
   const monthsArabic = ['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'];
 
   let yearOptionsHTML = '';
