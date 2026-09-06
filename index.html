@@ -154,6 +154,8 @@ th{color:var(--gold);font-weight:700;}
 .stepper-val{flex:1;text-align:center;font-weight:800;color:var(--gold);font-size:.92rem;}
 .stepper-presets{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px;}
 .chip-btn{padding:5px 11px;border-radius:100px;background:rgba(255,255,255,.05);border:1px solid var(--border);color:#d8d8de;font-size:.74rem;font-weight:700;}
+.chip-ok{padding:3px 10px;border-radius:100px;background:rgba(52,211,153,.15);border:1px solid rgba(52,211,153,.4);color:#34d399;font-size:.72rem;font-weight:800;margin-inline-start:8px;}
+.chip-warn{padding:3px 10px;border-radius:100px;background:rgba(255,85,85,.15);border:1px solid rgba(255,85,85,.4);color:#ff5555;font-size:.72rem;font-weight:800;margin-inline-start:8px;}
 .chip-btn:hover{background:var(--gold);color:#141406;border-color:transparent;}
 .chip{display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,0.06);border:1px solid var(--border);border-radius:100px;padding:5px 12px;font-size:.78rem;margin:3px;}
 .chip button{background:none;border:none;color:var(--danger);padding:0;font-size:.8rem;cursor:pointer;}
@@ -559,7 +561,7 @@ body{font-family:var(--font-ar),"Cairo","Noto Naskh Arabic","Geeza Pro",sans-ser
 .print-tbt{padding:22px 26px!important;}
 .print-tbt h4{font-size:1.7rem!important;}
 .print-tbt p{font-size:1.65rem!important;line-height:1.9!important;}
-.print-meta-line{font-size:1.15rem;font-weight:700;color:#111;margin-bottom:16px;padding-bottom:10px;border-bottom:2px solid #e8b93f;}
+.print-meta-line{font-size:1.15rem;font-weight:700;color:#f2f2f7;margin-bottom:16px;padding-bottom:10px;border-bottom:2px solid #e8b93f;}
 .roster-print-header{display:grid;grid-template-columns:1fr 1.35fr 1fr;align-items:center;gap:24px;margin-bottom:26px;direction:ltr;}
 .roster-print-header .rph-logo{display:flex;align-items:center;justify-content:flex-start;}
 .roster-print-header .rph-logo img{width:180px;height:180px;object-fit:contain;display:block;image-rendering:-webkit-optimize-contrast;image-rendering:crisp-edges;}
@@ -605,27 +607,28 @@ body{font-family:var(--font-ar),"Cairo","Noto Naskh Arabic","Geeza Pro",sans-ser
 .roster-brand-copy strong{font-size:1.35rem!important;font-weight:900!important}
 .roster-brand-copy span{font-size:.86rem!important;font-weight:900!important;letter-spacing:2.6px!important;text-transform:uppercase!important}
 
-/* The on-screen .rt-table uses a dark "liquid glass" theme, but exported
-   images/PDFs (roster, berth plan, handover — all rendered inside a
-   .print-wrap) need to stay light and print-legible. This overrides the
-   dark theme ONLY inside .print-wrap, so the live screen view is untouched. */
-.print-wrap .rt-table{background:#ffffff!important;color:#111111!important;box-shadow:none!important;}
-.print-wrap .rt-table th,.print-wrap .rt-table td{border-color:#000!important;}
-.print-wrap .rt-table thead tr:first-child th.rt-title,.print-wrap .rt-table thead tr:first-child th.rt-team{background:#1f3b57!important;color:#fff!important;}
-.print-wrap .rt-table thead tr:nth-child(2) th{background:#7f8fa4!important;color:#fff!important;}
-.print-wrap .rt-table tbody td,.print-wrap .rt-table tbody tr:nth-child(even) td,.print-wrap .rt-table td.rt-team{background:#eef1f4!important;color:#111111!important;}
-.print-wrap .rt-table tbody tr:nth-child(odd) td{background:#ffffff!important;}
-.print-wrap .rt-table td.rt-crane{color:#155724!important;font-weight:800!important;}
+/* Exported roster/berth-plan/handover tables (.print-wrap) get a clean,
+   deliberate iOS-dark-mode look: deep near-black background, iOS system
+   colors for accents, soft hairline separators, high-contrast text — not
+   a re-skin of the on-screen "liquid glass" theme, a dedicated export
+   theme so it stays crisp and legible however it's zoomed or printed. */
+.print-wrap{background:#000000!important;}
+.print-wrap .rt-table{background:#1c1c1e!important;color:#f2f2f7!important;border:1px solid rgba(255,255,255,.12)!important;border-radius:22px!important;overflow:hidden!important;box-shadow:0 24px 60px rgba(0,0,0,.55)!important;}
+.print-wrap .rt-table th,.print-wrap .rt-table td{border:none!important;border-bottom:1px solid rgba(255,255,255,.09)!important;}
+.print-wrap .rt-table tbody tr:last-child td{border-bottom:none!important;}
+.print-wrap .rt-table thead tr:first-child th.rt-title,.print-wrap .rt-table thead tr:first-child th.rt-team{background:linear-gradient(135deg,#0A84FF,#0056c7)!important;color:#ffffff!important;}
+.print-wrap .rt-table thead tr:nth-child(2) th{background:#2c2c2e!important;color:#f2f2f7!important;}
+.print-wrap .rt-table tbody td,.print-wrap .rt-table tbody tr:nth-child(even) td,.print-wrap .rt-table td.rt-team{background:#242426!important;color:#f2f2f7!important;}
+.print-wrap .rt-table tbody tr:nth-child(odd) td{background:#1c1c1e!important;}
+.print-wrap .rt-table td.rt-crane{color:#64D2FF!important;font-weight:800!important;}
+.print-wrap .rt-table .rt-en{color:#98989f!important;}
 
 /* Mac-style table refinement: thin hairline row separators and soft
-   rounded corners instead of the old thick black grid-lines, for both the
-   on-screen table and the export/print version. */
+   rounded corners instead of the old thick black grid-lines — applies to
+   the on-screen table too. */
 .rt-table{border:1px solid rgba(255,255,255,.10)!important;border-radius:20px!important;overflow:hidden!important;border-collapse:separate!important;border-spacing:0!important;box-shadow:0 20px 50px rgba(0,0,0,.35),inset 0 1px 0 rgba(255,255,255,.06)!important;}
 .rt-table th,.rt-table td{border:none!important;border-bottom:1px solid rgba(255,255,255,.07)!important;}
 .rt-table tbody tr:last-child td{border-bottom:none!important;}
-.print-wrap .rt-table{border:1px solid #e2e5e9!important;box-shadow:0 10px 30px rgba(0,0,0,.08)!important;}
-.print-wrap .rt-table th,.print-wrap .rt-table td{border:none!important;border-bottom:1px solid #e5e8eb!important;}
-.print-wrap .rt-table tbody tr:last-child td{border-bottom:none!important;}
 
 /* Neutralizes backdrop-filter everywhere for the brief moment of an
    image/PDF export — see captureElementCanvas() for why. */
@@ -959,16 +962,16 @@ function renderLogin(){
 /* ===================== SHELL / TABS ===================== */
 const TABS = [
   {id:'crew', label:'التشغيل والمعدات', icon:'🏗️'},
-  {id:'pier', label:'خطة الأرصفة', icon:'⚓'},
   {id:'roster', label:'جدول الوردية', icon:'📋'},
   {id:'calendar', label:'جدول المناوبات', icon:'🗓️'},
-  {id:'leaves', label:'الإجازات', icon:'🌴'},
-  {id:'handover', label:'التسليم والتسلم', icon:'🔄'},
+  {id:'pier', label:'خطة الأرصفة', icon:'⚓'},
   {id:'holdplan', label:'مخطط العنابر', icon:'🚢'},
+  {id:'draftsurvey', label:'سرفي الغاطس', icon:'📏'},
   {id:'kpi', label:'الأداء والـ KPIs', icon:'📊'},
   {id:'yardmgmt', label:'اليارد', icon:'🏭'},
+  {id:'leaves', label:'الإجازات', icon:'🌴'},
+  {id:'handover', label:'التسليم والتسلم', icon:'🔄'},
   {id:'reports', label:'سجل العمليات', icon:'🧾'},
-  {id:'draftsurvey', label:'سرفي الغاطس', icon:'⚓'},
   {id:'settings', label:'الإعدادات', icon:'⚙️'},
 ];
 
@@ -1876,12 +1879,21 @@ function currentRosterDate(){
   return el ? el.value : todayStr();
 }
 function getRoster(date){
-  if(!state.rosterDates[date]) state.rosterDates[date] = {vessels:[], tbt:'', otherTasks:[], teamAssignments:[]};
+  if(!state.rosterDates[date]) state.rosterDates[date] = {vessels:[], tbt:'', otherTasks:[], teamAssignments:[], supervisorId:''};
   if(!state.rosterDates[date].otherTasks) state.rosterDates[date].otherTasks = [];
   if(!state.rosterDates[date].teamAssignments) state.rosterDates[date].teamAssignments = [];
+  if(state.rosterDates[date].supervisorId===undefined) state.rosterDates[date].supervisorId = '';
   return state.rosterDates[date];
 }
+function setRosterSupervisor(date, supervisorId){
+  const roster = getRoster(date);
+  roster.supervisorId = supervisorId;
+  const sup = (state.crew.supervisors||[]).find(s=>s.id===supervisorId);
+  log('روستر','تحديد مشرف الوردية',null,{date, supervisor: sup?sup.name:''});
+  saveState(); renderTab();
+}
 function viewRoster(){
+  ensureCrewExtras();
   const date = currentRosterDate();
   const roster = getRoster(date);
   return `
@@ -1893,6 +1905,13 @@ function viewRoster(){
     </div>
     <div class="field" style="max-width:260px;margin-bottom:0;">
       <label>اسم الوردية</label><input id="shiftNameInput" value="${esc(state.shiftName)}" onchange="updateShiftName(this.value)">
+    </div>
+    <div class="field" style="max-width:240px;margin-bottom:0;">
+      <label>👤 المشرف المسئول عن الوردية</label>
+      <select onchange="setRosterSupervisor('${esc(date)}', this.value)">
+        <option value="">-- بدون --</option>
+        ${(state.crew.supervisors||[]).map(s=>`<option value="${esc(s.id)}" ${roster.supervisorId===s.id?'selected':''}>${esc(s.name)}</option>`).join('')}
+      </select>
     </div>
   </div>
 
@@ -1926,7 +1945,7 @@ function viewRoster(){
         <label>اختر رقم الونش</label>
         <select id="manualCraneNum-${esc(date)}">
           <option value="">-- اختر الونش --</option>
-          ${getAvailableMasterCranes(date).map(c=>`<option value="${esc(c.number)}">ونش ${esc(c.number)}</option>`).join('')}
+          ${getAvailableMasterCranes(date).map(c=>`<option value="${esc(c.number)}">ونش ${esc(c.number)}${getDownCraneNumbers().has(c.number)?' ⚠️ متوقف':''}</option>`).join('')}
         </select>
       </div>
       <div class="field" style="margin-bottom:0;">
@@ -2109,7 +2128,7 @@ function renderRosterVessels(date){
             <label>اختر رقم الونش</label>
             <select id="craneNum-${esc(rv.id)}">
               <option value="">-- اختر الونش --</option>
-              ${available.map(c=>`<option value="${esc(c.number)}">ونش ${esc(c.number)}</option>`).join('')}
+              ${available.map(c=>`<option value="${esc(c.number)}">ونش ${esc(c.number)}${getDownCraneNumbers().has(c.number)?' ⚠️ متوقف':''}</option>`).join('')}
             </select>
             ${!available.length?'<div class="muted" style="margin-top:6px;">لا توجد أوناش متاحة؛ الأوناش المستخدمة في هذه التقسيمة مخفية تلقائياً.</div>':''}
           </div>
@@ -2531,10 +2550,10 @@ function buildRosterPrintBundleHTML(date){
 }
 
 function shareRosterTable(date){
-  shareElement('rosterTableCapture', `roster_table_${esc(date)}.png`, '#ffffff');
+  shareElement('rosterTableCapture', `roster_table_${esc(date)}.png`, '#0b0b10');
 }
 function shareRosterTablePDF(date){
-  shareElementAsPDF('rosterTableCapture', `roster_table_${esc(date)}.pdf`, '#ffffff');
+  shareElementAsPDF('rosterTableCapture', `roster_table_${esc(date)}.pdf`, '#0b0b10');
 }
 
 /* =========================================================
@@ -2605,10 +2624,10 @@ function buildPierPrintBundleHTML(){
 }
 
 function sharePierTable(){
-  shareElement('pierTableCapture', `berth_plan_${todayStr()}.png`, '#ffffff');
+  shareElement('pierTableCapture', `berth_plan_${todayStr()}.png`, '#0b0b10');
 }
 function sharePierTablePDF(){
-  shareElementAsPDF('pierTableCapture', `berth_plan_${todayStr()}.pdf`, '#ffffff');
+  shareElementAsPDF('pierTableCapture', `berth_plan_${todayStr()}.pdf`, '#0b0b10');
 }
 
 function assignOperatorText(date, vId, crId) {
@@ -3412,7 +3431,7 @@ function renderHoldPlanEntries(){
             <div class="field"><label>الونش</label>
               <select onchange="updateHoldField('${esc(p.id)}',${h.index},'craneNumber',this.value)">
                 <option value="">-- بدون --</option>
-                ${cranesList.map(c=>`<option value="${esc(c.number)}" ${h.craneNumber===c.number?'selected':''}>ونش ${esc(c.number)}</option>`).join('')}
+                ${cranesList.map(c=>`<option value="${esc(c.number)}" ${h.craneNumber===c.number?'selected':''}>ونش ${esc(c.number)}${getDownCraneNumbers().has(c.number)?' ⚠️ متوقف':''}</option>`).join('')}
               </select>
             </div>
             <div class="field"><label>اللودر</label>
@@ -3853,10 +3872,10 @@ function buildHandoverPrintBundleHTML(){
 }
 
 function shareHandoverTable(){
-  shareElement('handoverTableCapture', `handover_summary_${todayStr()}.png`, '#ffffff');
+  shareElement('handoverTableCapture', `handover_summary_${todayStr()}.png`, '#0b0b10');
 }
 function shareHandoverTablePDF(){
-  shareElementAsPDF('handoverTableCapture', `handover_summary_${todayStr()}.pdf`, '#ffffff');
+  shareElementAsPDF('handoverTableCapture', `handover_summary_${todayStr()}.pdf`, '#0b0b10');
 }
 
 /* ===================== REPORTS ===================== */
@@ -4014,7 +4033,7 @@ function renderKPILogForm(){
           <div class="field"><label>${ar?'الونش':'Crane'}</label>
             <select onchange="updateKPICraneRow(${i},'craneId',this.value)">
               <option value="">--</option>
-              ${cranes.map(c=>`<option value="${esc(c.id)}" ${e.craneId===c.id?'selected':''}>${esc(c.name||c.number||c.id)}</option>`).join('')}
+              ${cranes.map(c=>`<option value="${esc(c.id)}" ${e.craneId===c.id?'selected':''}>${esc(c.name||c.number||c.id)}${getDownCraneNumbers().has(c.number)?' ⚠️ متوقف':''}</option>`).join('')}
             </select>
           </div>
           <div class="field"><label>${ar?'المشغل':'Operator'}</label>
@@ -4218,6 +4237,7 @@ function renderKPIVesselLogList(){
 function renderKPIIncidents(){
   const ar = currentLang()==='ar';
   const cranes = state.crew.cranes||[];
+  const people = getAllPeopleInSystem();
   const list = state.kpi.incidents||[];
   return `
   <div class="card" style="margin-bottom:16px;">
@@ -4241,6 +4261,12 @@ function renderKPIIncidents(){
           <option value="high">${ar?'عالية':'High'}</option>
         </select>
       </div>
+      <div class="field"><label>${ar?'المسئول عن المتابعة (اختياري)':'Assigned to (optional)'}</label>
+        <select id="incAssignee">
+          <option value="">--</option>
+          ${people.map(p=>`<option value="${esc(p.name)}">${esc(p.name)} — ${esc(p.role)}</option>`).join('')}
+        </select>
+      </div>
       <div class="field" style="grid-column:1/-1;"><label>${ar?'الوصف':'Description'}</label><textarea id="incDesc" rows="3" placeholder="${ar?'وصف موجز للحادثة...':'Brief description...'}"></textarea></div>
     </div>
     <button class="btn-gold" style="width:100%;margin-top:10px;" onclick="saveKPIIncident()">💾 ${ar?'حفظ':'Save'}</button>
@@ -4253,7 +4279,7 @@ function renderKPIIncidents(){
         <div>
           <div class="row"><b style="color:${i.severity==='high'?'#ff5555':(i.severity==='medium'?'#ffb020':'var(--gold)')};">${esc(typeLabel(i.type,ar))}</b> — <span class="muted">${esc(i.date)} ${i.craneName?('· '+esc(i.craneName)):''}</span></div>
           <div>${esc(i.description)}</div>
-          <div class="audit">${ar?'بواسطة':'By'}: ${esc(i.user||'-')}</div>
+          <div class="audit">${ar?'بواسطة':'By'}: ${esc(i.user||'-')}${i.assignee?(' · '+(ar?'المسئول':'Assigned to')+': '+esc(i.assignee)):''}</div>
         </div>
         <button class="btn-danger btn-sm" onclick="removeKPIIncident('${esc(i.id)}')">🗑️</button>
       </div>`).join('')}
@@ -4274,6 +4300,7 @@ function saveKPIIncident(){
     id: uid(), createdAt: new Date().toISOString(), date: document.getElementById('incDate').value||todayStr(),
     craneId: craneId||null, craneName: (cranes.find(c=>c.id===craneId)||{}).name||'',
     type: document.getElementById('incType').value, severity: document.getElementById('incSeverity').value,
+    assignee: document.getElementById('incAssignee').value||'',
     description: desc, user: state.name
   };
   state.kpi.incidents.unshift(entry);
@@ -4330,13 +4357,33 @@ function renderKPIBreakdowns(){
         return `
       <div class="list-item">
         <div>
-          <div class="row"><b style="color:var(--gold);">${esc(b.craneName)}</b> — <span class="muted">${esc(b.date)} · ${esc(b.type==='mechanical'?(ar?'ميكانيكي':'Mechanical'):b.type==='electrical'?(ar?'كهربائي':'Electrical'):(ar?'أخرى':'Other'))}</span></div>
+          <div class="row"><b style="color:var(--gold);">${esc(b.craneName)}</b> — <span class="muted">${esc(b.date)} · ${esc(b.type==='mechanical'?(ar?'ميكانيكي':'Mechanical'):b.type==='electrical'?(ar?'كهربائي':'Electrical'):(ar?'أخرى':'Other'))}</span>
+          ${b.resolved ? `<span class="chip-ok">✅ ${ar?'تم الإصلاح':'Fixed'}</span>` : `<span class="chip-warn">⚠️ ${ar?'الونش متوقف':'Crane is down'}</span>`}</div>
           <div>${esc(b.note||'')}</div>
           <div class="muted">${ar?'توقف':'Downtime'}: ${b.downtimeMinutes} ${ar?'د':'min'} · OEE: ${oee.toFixed(1)}%</div>
         </div>
-        <button class="btn-danger btn-sm" onclick="removeKPIBreakdown('${esc(b.id)}')">🗑️</button>
+        <div class="row" style="gap:6px;">
+          ${!b.resolved ? `<button class="btn-ghost btn-sm" onclick="toggleBreakdownResolved('${esc(b.id)}')">✅ ${ar?'تم الإصلاح':'Mark fixed'}</button>` : ''}
+          <button class="btn-danger btn-sm" onclick="removeKPIBreakdown('${esc(b.id)}')">🗑️</button>
+        </div>
       </div>`;}).join('')}
   </div>`;
+}
+function toggleBreakdownResolved(id){
+  const b = state.kpi.breakdowns.find(x=>x.id===id);
+  if(!b) return;
+  b.resolved = true;
+  log('kpi_breakdown','تم الإصلاح',null,{crane:b.craneName});
+  saveState(); renderTab();
+}
+/* Any crane with an unresolved breakdown is flagged "down" everywhere the
+   program lets you pick a crane (roster, hold plan, KPI log) — so a broken
+   crane never gets silently re-assigned without someone noticing. */
+function getDownCraneNumbers(){
+  ensureKPI();
+  const cranes = state.crew.cranes||[];
+  const downIds = new Set((state.kpi.breakdowns||[]).filter(b=>!b.resolved).map(b=>b.craneId));
+  return new Set(cranes.filter(c=>downIds.has(c.id)).map(c=>c.number));
 }
 function saveKPIBreakdown(){
   ensureKPI(); ensureYardData(); ensureCrewExtras();
@@ -4350,7 +4397,7 @@ function saveKPIBreakdown(){
     type: document.getElementById('bkType').value,
     downtimeMinutes: parseFloat(document.getElementById('bkDowntime').value)||0,
     plannedMinutes: parseFloat(document.getElementById('bkPlanned').value)||720,
-    note: document.getElementById('bkNote').value.trim(), user: state.name
+    note: document.getElementById('bkNote').value.trim(), user: state.name, resolved: false
   };
   state.kpi.breakdowns.unshift(entry);
   log('kpi_breakdown','create',null,`${entry.craneName} - ${entry.downtimeMinutes}min`);
@@ -4840,6 +4887,13 @@ function dsShipTypeChanged(sel){
   const cbInput = document.getElementById('dsCb');
   if(t && cbInput) cbInput.value = t.cb;
 }
+function toggleDraftMode(mode){
+  const bothWrap = document.getElementById('dsBothSidesWrap');
+  const quayWrap = document.getElementById('dsQuayOnlyWrap');
+  if(!bothWrap || !quayWrap) return;
+  bothWrap.style.display = mode==='quayonly' ? 'none' : '';
+  quayWrap.style.display = mode==='quayonly' ? '' : 'none';
+}
 function viewDraftSurvey(){
   ensureDraftSurveys();
   const ar = currentLang()==='ar';
@@ -4881,15 +4935,72 @@ function viewDraftSurvey(){
     </div>
 
     <div class="divider"></div>
-    <div class="muted" style="margin-bottom:6px;">${ar?'قراءات الغاطس الستة (متر)':'The six draft readings (m)'}</div>
-    <div class="g3">
-      <div class="field"><label>${ar?'قدام يمين (Fwd Stbd)':'Fwd Starboard'}</label><input id="dsFwdS" type="number" step="0.001" placeholder="0.000"></div>
-      <div class="field"><label>${ar?'قدام يسار (Fwd Port)':'Fwd Port'}</label><input id="dsFwdP" type="number" step="0.001" placeholder="0.000"></div>
-      <div class="field"><label>${ar?'وسط يمين (Mid Stbd)':'Mid Starboard'}</label><input id="dsMidS" type="number" step="0.001" placeholder="0.000"></div>
-      <div class="field"><label>${ar?'وسط يسار (Mid Port)':'Mid Port'}</label><input id="dsMidP" type="number" step="0.001" placeholder="0.000"></div>
-      <div class="field"><label>${ar?'خلف يمين (Aft Stbd)':'Aft Starboard'}</label><input id="dsAftS" type="number" step="0.001" placeholder="0.000"></div>
-      <div class="field"><label>${ar?'خلف يسار (Aft Port)':'Aft Port'}</label><input id="dsAftP" type="number" step="0.001" placeholder="0.000"></div>
+    <div class="field" style="max-width:420px;">
+      <label>${ar?'طريقة قياس الغاطس':'How was the draft measured'}</label>
+      <select id="dsMeasureMode" onchange="toggleDraftMode(this.value)">
+        <option value="both">${ar?'اتقاست من الجنبين (٦ قراءات)':'Measured from both sides (6 readings)'}</option>
+        <option value="quayonly">${ar?'اتقاست من جنب الرصيف بس + زاوية الميلان':'Measured from the quay side only + list angle'}</option>
+      </select>
     </div>
+
+    <div id="dsBothSidesWrap">
+      <div class="muted" style="margin:10px 0 6px;">${ar?'قراءات الغاطس الستة (متر)':'The six draft readings (m)'}</div>
+      <div class="g3">
+        <div class="field"><label>${ar?'قدام يمين (Fwd Stbd)':'Fwd Starboard'}</label><input id="dsFwdS" type="number" step="0.001" placeholder="0.000"></div>
+        <div class="field"><label>${ar?'قدام يسار (Fwd Port)':'Fwd Port'}</label><input id="dsFwdP" type="number" step="0.001" placeholder="0.000"></div>
+        <div class="field"><label>${ar?'وسط يمين (Mid Stbd)':'Mid Starboard'}</label><input id="dsMidS" type="number" step="0.001" placeholder="0.000"></div>
+        <div class="field"><label>${ar?'وسط يسار (Mid Port)':'Mid Port'}</label><input id="dsMidP" type="number" step="0.001" placeholder="0.000"></div>
+        <div class="field"><label>${ar?'خلف يمين (Aft Stbd)':'Aft Starboard'}</label><input id="dsAftS" type="number" step="0.001" placeholder="0.000"></div>
+        <div class="field"><label>${ar?'خلف يسار (Aft Port)':'Aft Port'}</label><input id="dsAftP" type="number" step="0.001" placeholder="0.000"></div>
+      </div>
+      <div class="divider"></div>
+      <div class="notice" style="margin-bottom:10px;">
+        🧭 ${ar?'لو معرفتش تجيب قراءة جنب من جانب البحر: سيب خانته فاضية، وادخل زاوية ميلان السفينة الجانبي (List) واتجاهها هنا — البرنامج هيحسبها تلقائيًا من الجنب التاني بمعادلة الميل القياسية.'
+          :'If you can’t take a reading from the sea side: leave that field blank, and enter the ship’s list angle and direction below — it will be calculated automatically from the other side using the standard list correction.'}
+      </div>
+      <div class="g3">
+        <div class="field"><label>${ar?'زاوية الميلان الجانبي List (درجة)':'List angle (degrees)'}</label>
+          <input id="dsListAngle" type="number" min="0" max="15" step="0.1" placeholder="${ar?'مثال: 1.5':'e.g. 1.5'}">
+        </div>
+        <div class="field"><label>${ar?'اتجاه الميلان':'List direction'}</label>
+          <select id="dsListDir">
+            <option value="none">${ar?'بدون ميلان':'No list'}</option>
+            <option value="stbd">${ar?'ميلان لليمين (Stbd)':'Listing to Starboard'}</option>
+            <option value="port">${ar?'ميلان لليسار (Port)':'Listing to Port'}</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <div id="dsQuayOnlyWrap" style="display:none;">
+      <div class="notice" style="margin:10px 0;">
+        🧭 ${ar?'جبت غاطس القدام والوسط والخلف من جنب الرصيف بس — البرنامج هيحسبلك جنب البحر تلقائيًا من زاوية الميلان (لغاية حوالي ٦ درجة أو أكتر شوية برضه بيشتغل صح).'
+          :'You took the fwd/mid/aft drafts from the quay side only — the sea side will be calculated automatically from the list angle (works fine up to about 6° or a bit more).'}
+      </div>
+      <div class="g2">
+        <div class="field"><label>${ar?'جنب الرصيف ده هو:':'The quay side is:'}</label>
+          <select id="dsQuaySide">
+            <option value="port">${ar?'يسار السفينة (Port)':'Port (left)'}</option>
+            <option value="stbd">${ar?'يمين السفينة (Starboard)':'Starboard (right)'}</option>
+          </select>
+        </div>
+        <div class="field"><label>${ar?'السفينة مايلة ناحية:':'The ship is leaning toward:'}</label>
+          <select id="dsTiltToward">
+            <option value="quay">${ar?'الرصيف':'The quay'}</option>
+            <option value="sea">${ar?'البحر':'The sea'}</option>
+          </select>
+        </div>
+      </div>
+      <div class="g3">
+        <div class="field"><label>${ar?'غاطس قدام (جنب الرصيف)':'Fwd draft (quay side)'}</label><input id="dsQFwd" type="number" step="0.001" placeholder="0.000"></div>
+        <div class="field"><label>${ar?'غاطس وسط (جنب الرصيف)':'Mid draft (quay side)'}</label><input id="dsQMid" type="number" step="0.001" placeholder="0.000"></div>
+        <div class="field"><label>${ar?'غاطس خلف (جنب الرصيف)':'Aft draft (quay side)'}</label><input id="dsQAft" type="number" step="0.001" placeholder="0.000"></div>
+      </div>
+      <div class="field" style="max-width:280px;margin-top:8px;"><label>${ar?'زاوية الميلان (درجة)':'List angle (degrees)'}</label>
+        <input id="dsQListAngle" type="number" min="0" max="12" step="0.1" placeholder="${ar?'مثال: 6':'e.g. 6'}">
+      </div>
+    </div>
+
     <div class="field" style="margin-top:10px;"><label>${ar?'ملاحظة':'Note'}</label><input id="dsNote" placeholder="${ar?'مثال: قبل بدء التفريغ':'e.g. Before discharge started'}"></div>
     <button class="btn-gold" style="width:100%;margin-top:10px;" onclick="saveDraftSurvey()">💾 ${ar?'حفظ القراءة':'Save reading'}</button>
   </div>
@@ -4902,6 +5013,21 @@ function viewDraftSurvey(){
   </div>
   </div>`;
 }
+/* Standard list (heel) correction: when a ship lists toward one side, the
+   draft mark on that side reads deeper and the opposite side reads
+   shallower by roughly Beam × tan(list angle) between them — used here to
+   fill in a side that couldn't be physically read from the sea. */
+function applyListCorrection(port, stbd, beam, listDeg, listDir){
+  if(!listDeg || listDir==='none' || !beam) return {port, stbd};
+  const diff = beam * Math.tan(listDeg*Math.PI/180);
+  const hasPort = !!port, hasStbd = !!stbd;
+  if(hasPort && !hasStbd){
+    stbd = listDir==='stbd' ? port+diff : port-diff;
+  } else if(hasStbd && !hasPort){
+    port = listDir==='stbd' ? stbd-diff : stbd+diff;
+  }
+  return {port, stbd};
+}
 function saveDraftSurvey(){
   ensureDraftSurveys();
   const ar = currentLang()==='ar';
@@ -4910,15 +5036,47 @@ function saveDraftSurvey(){
   const beam = parseFloat(document.getElementById('dsBeam').value)||0;
   const cb = parseFloat(document.getElementById('dsCb').value)||0.7;
   const density = parseFloat(document.getElementById('dsDensity').value)||1.025;
-  const d = {
-    fwdP: parseFloat(document.getElementById('dsFwdP').value)||0,
-    fwdS: parseFloat(document.getElementById('dsFwdS').value)||0,
-    midP: parseFloat(document.getElementById('dsMidP').value)||0,
-    midS: parseFloat(document.getElementById('dsMidS').value)||0,
-    aftP: parseFloat(document.getElementById('dsAftP').value)||0,
-    aftS: parseFloat(document.getElementById('dsAftS').value)||0,
-    lbp, beam, cb, density
-  };
+  const mode = document.getElementById('dsMeasureMode').value;
+
+  let fwdP, fwdS, midP, midS, aftP, aftS, listUsed=false, listAngleUsed=0, listDirUsed='none';
+
+  if(mode==='quayonly'){
+    const quaySide = document.getElementById('dsQuaySide').value; // 'port' | 'stbd'
+    const tiltToward = document.getElementById('dsTiltToward').value; // 'quay' | 'sea'
+    const qFwd = parseFloat(document.getElementById('dsQFwd').value)||0;
+    const qMid = parseFloat(document.getElementById('dsQMid').value)||0;
+    const qAft = parseFloat(document.getElementById('dsQAft').value)||0;
+    const listAngle = parseFloat(document.getElementById('dsQListAngle').value)||0;
+    // Leaning toward the quay means listing toward whichever side the quay is on.
+    const listDir = listAngle>0 ? (tiltToward==='quay' ? quaySide : (quaySide==='port'?'stbd':'port')) : 'none';
+    fwdP = quaySide==='port' ? qFwd : 0; fwdS = quaySide==='stbd' ? qFwd : 0;
+    midP = quaySide==='port' ? qMid : 0; midS = quaySide==='stbd' ? qMid : 0;
+    aftP = quaySide==='port' ? qAft : 0; aftS = quaySide==='stbd' ? qAft : 0;
+    if(listAngle>0){
+      ({port:fwdP, stbd:fwdS} = applyListCorrection(fwdP, fwdS, beam, listAngle, listDir));
+      ({port:midP, stbd:midS} = applyListCorrection(midP, midS, beam, listAngle, listDir));
+      ({port:aftP, stbd:aftS} = applyListCorrection(aftP, aftS, beam, listAngle, listDir));
+      listUsed = true; listAngleUsed = listAngle; listDirUsed = listDir;
+    }
+  } else {
+    fwdP = parseFloat(document.getElementById('dsFwdP').value)||0;
+    fwdS = parseFloat(document.getElementById('dsFwdS').value)||0;
+    midP = parseFloat(document.getElementById('dsMidP').value)||0;
+    midS = parseFloat(document.getElementById('dsMidS').value)||0;
+    aftP = parseFloat(document.getElementById('dsAftP').value)||0;
+    aftS = parseFloat(document.getElementById('dsAftS').value)||0;
+    const listAngle = parseFloat(document.getElementById('dsListAngle').value)||0;
+    const listDir = document.getElementById('dsListDir').value;
+    if(listAngle>0 && listDir!=='none'){
+      ({port:fwdP, stbd:fwdS} = applyListCorrection(fwdP, fwdS, beam, listAngle, listDir));
+      ({port:midP, stbd:midS} = applyListCorrection(midP, midS, beam, listAngle, listDir));
+      ({port:aftP, stbd:aftS} = applyListCorrection(aftP, aftS, beam, listAngle, listDir));
+      listUsed = true; listAngleUsed = listAngle; listDirUsed = listDir;
+    }
+  }
+
+  const d = { fwdP, fwdS, midP, midS, aftP, aftS, lbp, beam, cb, density };
+
   if(!vessel || !lbp || !beam){ alert(ar?'من فضلك أدخل اسم السفينة والطول والعرض':'Please enter the vessel name, LBP and beam'); return; }
   if(!d.fwdP && !d.fwdS && !d.aftP && !d.aftS){ alert(ar?'من فضلك أدخل قراءات الغاطس':'Please enter the draft readings'); return; }
   const computed = computeDraftSurvey(d);
@@ -4926,7 +5084,8 @@ function saveDraftSurvey(){
     id: uid(), createdAt: new Date().toISOString(),
     vesselName: vessel, date: document.getElementById('dsDateTime').value,
     shipTypeId: document.getElementById('dsShipType').value,
-    drafts: d, computed, note: document.getElementById('dsNote').value.trim(), user: state.name
+    drafts: d, computed, listUsed, listAngle: listAngleUsed, listDir: listDirUsed,
+    note: document.getElementById('dsNote').value.trim(), user: state.name
   };
   state.draftSurveys.unshift(entry);
   log('سرفي الغاطس','حفظ قراءة',null,{vessel, displacement: Math.round(computed.displacement)});
@@ -4944,7 +5103,7 @@ function renderDraftSurveyList(surveys, ar){
     <div class="list-item">
       <div>
         <div class="row"><b style="color:var(--gold);">${esc(s.vesselName)}</b> — <span class="muted">${esc(new Date(s.date).toLocaleString(ar?'ar-EG':'en-GB'))}</span></div>
-        <div class="muted">${ar?'غاطس متوسط':'Mean draft'}: ${s.computed.quarterMean.toFixed(3)}m · ${ar?'ميل':'Trim'}: ${s.computed.trim.toFixed(3)}m · ${ar?'الإزاحة التقديرية':'Est. displacement'}: <b>${Math.round(s.computed.displacement).toLocaleString()} ${ar?'طن':'t'}</b>${s.note?(' · '+esc(s.note)):''}</div>
+        <div class="muted">${ar?'غاطس متوسط':'Mean draft'}: ${s.computed.quarterMean.toFixed(3)}m · ${ar?'ميل':'Trim'}: ${s.computed.trim.toFixed(3)}m · ${ar?'الإزاحة التقديرية':'Est. displacement'}: <b>${Math.round(s.computed.displacement).toLocaleString()} ${ar?'طن':'t'}</b>${s.listUsed?(' · 🧭 '+(ar?'اتحسبت جوانب ناقصة من زاوية الميلان':'missing side derived from list angle')):''}${s.note?(' · '+esc(s.note)):''}</div>
       </div>
       <button class="btn-danger btn-sm" onclick="deleteDraftSurvey('${esc(s.id)}')">🗑️</button>
     </div>`).join('');
@@ -5186,31 +5345,28 @@ function composeWithLogo(sourceCanvas, bgOverride){
   return new Promise((resolve)=>{
     function draw(logo){
       const isDark = !!bgOverride && bgOverride.toLowerCase()!=='#ffffff';
-      const topBandH = Math.max(120, Math.min(200, Math.round(sourceCanvas.width*0.055)));
+      const topBandH = Math.max(150, Math.min(260, Math.round(sourceCanvas.width*0.07)));
       const botBandH = Math.max(70, Math.min(110, Math.round(sourceCanvas.width*0.03)));
       const out = document.createElement('canvas');
       out.width = sourceCanvas.width;
       out.height = topBandH + sourceCanvas.height + botBandH;
       const ctx = out.getContext('2d');
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
       const bandBg = isDark ? (bgOverride||'#0b1220') : '#ffffff';
       const ar = currentLang && currentLang()==='ar';
 
-      // --- Top band: logo + tagline underneath it (no "AF Logic" wordmark text) ---
+      // --- Top band: logo only, sized clearly, no wordmark text under it ---
       ctx.fillStyle = bandBg;
       ctx.fillRect(0,0,out.width,topBandH);
       ctx.fillStyle = '#e8b93f';
       ctx.fillRect(0, topBandH-4, out.width, 4);
       const pad = topBandH*0.16;
-      const logoH = topBandH*0.5;
+      const logoH = topBandH*0.72;
       const logoW = logo ? logoH * (logo.width/logo.height) : logoH;
       const logoX = ar ? out.width - pad - logoW : pad;
-      const logoY = topBandH*0.14;
+      const logoY = (topBandH-4-logoH)/2;
       if(logo) ctx.drawImage(logo, logoX, logoY, logoW, logoH);
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'top';
-      ctx.fillStyle = isDark ? '#9aa4b5' : '#5a5a5a';
-      ctx.font = `600 ${Math.round(topBandH*0.13)}px Arial, sans-serif`;
-      ctx.fillText('AF Logic', logoX + logoW/2, logoY + logoH + topBandH*0.08);
 
       // --- Captured content ---
       ctx.drawImage(sourceCanvas, 0, topBandH);
